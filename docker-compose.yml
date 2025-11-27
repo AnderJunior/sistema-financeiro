@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  sistema-financeiro:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        - NEXT_PUBLIC_ASAAS_ENVIRONMENT=${NEXT_PUBLIC_ASAAS_ENVIRONMENT:-production}
+    container_name: sistema-financeiro
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - ASAAS_API_TOKEN=${ASAAS_API_TOKEN}
+      - NEXT_PUBLIC_ASAAS_ENVIRONMENT=${NEXT_PUBLIC_ASAAS_ENVIRONMENT:-production}
+    labels:
+      # Labels do Traefik
+      - "traefik.enable=true"
+      - "traefik.http.routers.sistema-financeiro.rule=Host(`analiscode.com`)"
+      - "traefik.http.routers.sistema-financeiro.entrypoints=websecure"
+      - "traefik.http.routers.sistema-financeiro.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sistema-financeiro.middlewares=default-headers"
+      - "traefik.http.services.sistema-financeiro.loadbalancer.server.port=3000"
+      # Middleware para redirecionar HTTP para HTTPS
+      - "traefik.http.routers.sistema-financeiro-http.rule=Host(`analiscode.com`)"
+      - "traefik.http.routers.sistema-financeiro-http.entrypoints=web"
+      - "traefik.http.routers.sistema-financeiro-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.default-headers.headers.frameDeny=true"
+      - "traefik.http.middlewares.default-headers.headers.sslRedirect=true"
+      - "traefik.http.middlewares.default-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.default-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.default-headers.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.default-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.default-headers.headers.stsPreload=true"
+      - "traefik.http.middlewares.default-headers.headers.stsSeconds=31536000"
+    networks:
+      - eainet
+
+networks:
+  eainet:
+    external: true
+
