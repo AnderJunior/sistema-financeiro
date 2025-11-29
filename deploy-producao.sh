@@ -141,3 +141,5 @@ echo ""
 echo -e "${BLUE}Ou use o arquivo DEPLOY_PRODUCAO.md para instruções detalhadas${NC}\n"
 
 
+
+

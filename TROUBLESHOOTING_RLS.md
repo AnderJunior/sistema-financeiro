@@ -147,3 +147,5 @@ Se nenhuma das soluções funcionar, verifique:
 3. Se há erros nos logs do Supabase (Dashboard → Logs)
 
 
+
+

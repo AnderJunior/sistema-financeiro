@@ -54,3 +54,5 @@
 3. Verifique logs: `docker service logs -f sistema-financeiro_sistema-financeiro`
 
 
+
+

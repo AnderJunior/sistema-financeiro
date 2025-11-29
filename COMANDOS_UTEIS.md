@@ -324,3 +324,5 @@ docker stats --no-stream $(docker ps -q -f name=sistema-financeiro)
 ```
 
 
+
+

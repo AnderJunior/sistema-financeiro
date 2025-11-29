@@ -51,3 +51,5 @@ Os erros de TypeScript que causaram a desabilitação eram relacionados a:
 Esses problemas podem ser resolvidos adicionando `as any` nas tipagens apropriadas.
 
 
+
+
