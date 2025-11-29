@@ -4,11 +4,15 @@ import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { createClient } from '@/lib/supabase/client'
 import { useModal } from '@/contexts/ModalContext'
+import { Database } from '@/types/database.types'
+
+type Lancamento = Database['public']['Tables']['financeiro_lancamentos']['Row']
 
 interface LancamentoModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess?: () => void
+  lancamento?: Lancamento | null
 }
 
 // Helper para formatar valor em R$
@@ -37,12 +41,13 @@ function parseCurrencyValue(formattedValue: string): number {
   return parseFloat(numbers) / 100
 }
 
-export function LancamentoModal({ isOpen, onClose, onSuccess }: LancamentoModalProps) {
+export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: LancamentoModalProps) {
   const { alert } = useModal()
   const [loading, setLoading] = useState(false)
   const [categorias, setCategorias] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
   const [contasFinanceiras, setContasFinanceiras] = useState<any[]>([])
+  const isEditMode = !!lancamento
   const [activeTab, setActiveTab] = useState<'entrada' | 'saida' | 'transferencias'>('entrada')
   
   const [formData, setFormData] = useState({
@@ -70,10 +75,18 @@ export function LancamentoModal({ isOpen, onClose, onSuccess }: LancamentoModalP
     if (isOpen) {
       async function loadData() {
         const supabase = createClient()
+        // Obter usuário atual para buscar categorias coringas + categorias do usuário
+        const { data: { user } } = await supabase.auth.getUser()
         
         const [catRes, cliRes, contasRes] = await Promise.all([
-          supabase.from('financeiro_categorias').select('*').eq('ativo', true),
-          supabase.from('clientes').select('*').eq('status', 'ativo'),
+          supabase
+            .from('financeiro_categorias')
+            .select('*')
+            .eq('ativo', true)
+            .or(`is_coringa.eq.true${user?.id ? ',user_id.eq.' + user.id : ''}`)
+            .order('is_coringa', { ascending: false })
+            .order('nome', { ascending: true }),
+          supabase.from('clientes').select('*').order('nome', { ascending: true }),
           supabase.from('contas_financeiras').select('*').eq('ativo', true),
         ])
 
@@ -85,6 +98,53 @@ export function LancamentoModal({ isOpen, onClose, onSuccess }: LancamentoModalP
       loadData()
     }
   }, [isOpen])
+
+  // Preencher formulário quando estiver editando
+  useEffect(() => {
+    if (isOpen && lancamento) {
+      // Formatar valor como moeda
+      const valorFormatado = lancamento.valor 
+        ? formatCurrencyInput((lancamento.valor * 100).toString())
+        : ''
+
+      // Formatar datas (remover hora se houver)
+      const dataVencimento = lancamento.data_vencimento 
+        ? lancamento.data_vencimento.split('T')[0] 
+        : ''
+      const dataPagamento = lancamento.data_pagamento 
+        ? lancamento.data_pagamento.split('T')[0] 
+        : ''
+
+      setActiveTab(lancamento.tipo)
+      setFormData({
+        tipo: lancamento.tipo,
+        categoria_id: lancamento.categoria_id || '',
+        cliente_id: lancamento.cliente_id || '',
+        descricao: lancamento.descricao || '',
+        data_competencia: lancamento.data_competencia.split('T')[0] || new Date().toISOString().split('T')[0],
+        data_vencimento: dataVencimento,
+        data_pagamento: dataPagamento,
+        valor: valorFormatado,
+        status: lancamento.status,
+        forma_pagamento: lancamento.forma_pagamento || '',
+      })
+    } else if (isOpen && !lancamento) {
+      // Reset form quando não estiver editando
+      setActiveTab('entrada')
+      setFormData({
+        tipo: 'entrada',
+        categoria_id: '',
+        cliente_id: '',
+        descricao: '',
+        data_competencia: new Date().toISOString().split('T')[0],
+        data_vencimento: '',
+        data_pagamento: '',
+        valor: '',
+        status: 'previsto',
+        forma_pagamento: '',
+      })
+    }
+  }, [isOpen, lancamento])
 
   // Atualizar tipo quando a aba mudar (apenas para entrada/saída)
   useEffect(() => {
@@ -162,27 +222,42 @@ export function LancamentoModal({ isOpen, onClose, onSuccess }: LancamentoModalP
       return
     }
 
-    // Garantir que se a data de vencimento não tiver hora, seja 09:00
+    // Formatar data de vencimento (remover hora se houver, pois o campo é DATE)
     let dataVencimentoFormatada = formData.data_vencimento || null
-    if (dataVencimentoFormatada && dataVencimentoFormatada.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      dataVencimentoFormatada = `${dataVencimentoFormatada}T09:00:00`
+    if (dataVencimentoFormatada && dataVencimentoFormatada.includes('T')) {
+      dataVencimentoFormatada = dataVencimentoFormatada.split('T')[0]
     }
 
     const supabase = createClient()
-    const { error } = await supabase
-      .from('financeiro_lancamentos')
-      .insert([{
-        tipo: activeTab,
-        categoria_id: formData.categoria_id || null,
-        cliente_id: formData.cliente_id || null,
-        descricao: formData.descricao,
-        data_competencia: formData.data_competencia,
-        data_vencimento: dataVencimentoFormatada,
-        data_pagamento: formData.data_pagamento || null,
-        valor: valorNumerico,
-        status: formData.status,
-        forma_pagamento: formData.forma_pagamento || null,
-      }])
+    
+    const updateData = {
+      tipo: activeTab,
+      categoria_id: formData.categoria_id || null,
+      cliente_id: formData.cliente_id || null,
+      descricao: formData.descricao,
+      data_competencia: formData.data_competencia,
+      data_vencimento: dataVencimentoFormatada,
+      data_pagamento: formData.data_pagamento || null,
+      valor: valorNumerico,
+      status: formData.status,
+      forma_pagamento: formData.forma_pagamento || null,
+    }
+
+    let error
+    if (isEditMode && lancamento) {
+      // Atualizar lançamento existente
+      const { error: updateError } = await supabase
+        .from('financeiro_lancamentos')
+        .update(updateData)
+        .eq('id', lancamento.id)
+      error = updateError
+    } else {
+      // Criar novo lançamento
+      const { error: insertError } = await supabase
+        .from('financeiro_lancamentos')
+        .insert([updateData])
+      error = insertError
+    }
 
     if (!error) {
       // Reset form
@@ -201,33 +276,36 @@ export function LancamentoModal({ isOpen, onClose, onSuccess }: LancamentoModalP
       onSuccess?.()
       onClose()
     } else {
-      await alert('Erro ao criar lançamento: ' + error.message, 'Erro')
+      await alert(`Erro ao ${isEditMode ? 'atualizar' : 'criar'} lançamento: ` + error.message, 'Erro')
     }
     setLoading(false)
   }
 
   const handleClose = () => {
     if (!loading) {
-      setFormData({
-        tipo: activeTab === 'transferencias' ? 'entrada' : activeTab,
-        categoria_id: '',
-        cliente_id: '',
-        descricao: '',
-        data_competencia: new Date().toISOString().split('T')[0],
-        data_vencimento: '',
-        data_pagamento: '',
-        valor: '',
-        status: 'previsto',
-        forma_pagamento: '',
-      })
-      setTransferenciaData({
-        banco_origem_id: '',
-        banco_recebedor_id: '',
-        valor_enviado: '',
-        data_transferencia: new Date().toISOString().split('T')[0],
-        descricao: '',
-      })
-      setActiveTab('entrada')
+      // Reset form apenas se não estiver em modo de edição
+      if (!isEditMode) {
+        setFormData({
+          tipo: activeTab === 'transferencias' ? 'entrada' : activeTab,
+          categoria_id: '',
+          cliente_id: '',
+          descricao: '',
+          data_competencia: new Date().toISOString().split('T')[0],
+          data_vencimento: '',
+          data_pagamento: '',
+          valor: '',
+          status: 'previsto',
+          forma_pagamento: '',
+        })
+        setTransferenciaData({
+          banco_origem_id: '',
+          banco_recebedor_id: '',
+          valor_enviado: '',
+          data_transferencia: new Date().toISOString().split('T')[0],
+          descricao: '',
+        })
+        setActiveTab('entrada')
+      }
       onClose()
     }
   }
@@ -238,7 +316,7 @@ export function LancamentoModal({ isOpen, onClose, onSuccess }: LancamentoModalP
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Adicionar lançamento">
+    <Modal isOpen={isOpen} onClose={handleClose} title={isEditMode ? "Editar lançamento" : "Adicionar lançamento"}>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Tabs */}
         <div className="flex gap-2 border-b border-gray-200">
@@ -510,8 +588,8 @@ export function LancamentoModal({ isOpen, onClose, onSuccess }: LancamentoModalP
             className="flex-1 bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
           >
             {loading 
-              ? (activeTab === 'transferencias' ? 'Adicionando transferência...' : 'Adicionando...') 
-              : (activeTab === 'transferencias' ? 'Adicionar transferência' : 'Adicionar lançamento')
+              ? (activeTab === 'transferencias' ? 'Adicionando transferência...' : (isEditMode ? 'Salvando...' : 'Adicionando...')) 
+              : (activeTab === 'transferencias' ? 'Adicionar transferência' : (isEditMode ? 'Salvar alterações' : 'Adicionar lançamento'))
             }
           </button>
         </div>

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/database.types'
 import { Card } from '@/components/ui/Card'
 import { Loading } from '@/components/ui/Loading'
-import { Plus, Edit, Trash2, MoreVertical } from 'lucide-react'
+import { Plus, Edit, Trash2, MoreVertical, ChevronDown, ChevronUp } from 'lucide-react'
 import { CategoriaModal } from '@/components/modals/CategoriaModal'
 import { useModal } from '@/contexts/ModalContext'
 
@@ -17,14 +17,22 @@ export default function CategoriasPage() {
   const [activeTab, setActiveTab] = useState<'entrada' | 'saida'>('entrada')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingCategoria, setEditingCategoria] = useState<Categoria | null>(null)
+  const [expandedCoringas, setExpandedCoringas] = useState(true)
+  const [expandedPersonalizadas, setExpandedPersonalizadas] = useState(true)
   const { alert, confirm } = useModal()
 
   async function loadCategorias() {
     const supabase = createClient()
+    // Obter usuário atual
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    // Buscar categorias coringas (is_coringa = true) e categorias do usuário atual
     const { data, error } = await supabase
       .from('financeiro_categorias')
       .select('*')
       .eq('tipo', activeTab)
+      .or(`is_coringa.eq.true${user?.id ? ',user_id.eq.' + user.id : ''}`)
+      .order('is_coringa', { ascending: false })
       .order('nome', { ascending: true })
 
     if (error) {
@@ -41,11 +49,22 @@ export default function CategoriasPage() {
   }, [activeTab])
 
   const handleEdit = (categoria: Categoria) => {
+    // Não permitir editar categorias coringas
+    if (categoria.is_coringa) {
+      alert('Não é possível editar categorias coringas (padrão do sistema).', 'Aviso')
+      return
+    }
     setEditingCategoria(categoria)
     setIsModalOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (categoria: Categoria) => {
+    // Não permitir excluir categorias coringas
+    if (categoria.is_coringa) {
+      await alert('Não é possível excluir categorias coringas (padrão do sistema).', 'Aviso')
+      return
+    }
+
     const confirmed = await confirm(
       'Tem certeza que deseja excluir esta categoria?',
       'Confirmar exclusão',
@@ -59,7 +78,7 @@ export default function CategoriasPage() {
     const { error } = await supabase
       .from('financeiro_categorias')
       .delete()
-      .eq('id', id)
+      .eq('id', categoria.id)
 
     if (error) {
       await alert('Erro ao excluir categoria: ' + error.message, 'Erro')
@@ -69,6 +88,12 @@ export default function CategoriasPage() {
   }
 
   const handleToggleStatus = async (categoria: Categoria) => {
+    // Não permitir alterar status de categorias coringas
+    if (categoria.is_coringa) {
+      await alert('Não é possível alterar o status de categorias coringas (padrão do sistema).', 'Aviso')
+      return
+    }
+
     const supabase = createClient()
     const { error } = await supabase
       .from('financeiro_categorias')
@@ -93,6 +118,8 @@ export default function CategoriasPage() {
   }
 
   const categoriasFiltradas = categorias.filter(cat => cat.tipo === activeTab)
+  const categoriasCoringas = categoriasFiltradas.filter(cat => cat.is_coringa)
+  const categoriasPersonalizadas = categoriasFiltradas.filter(cat => !cat.is_coringa)
 
   if (loading) {
     return (
@@ -157,70 +184,151 @@ export default function CategoriasPage() {
           </button>
         </div>
 
-        {/* Tabela de Categorias */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Nome</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Descrição</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Situação</th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categoriasFiltradas.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-8 text-gray-500">
-                    Nenhuma categoria encontrada
-                  </td>
-                </tr>
+        {/* Tabela de Categorias Coringas - Sanfona */}
+        {categoriasCoringas.length > 0 && (
+          <div className="mb-8">
+            <button
+              onClick={() => setExpandedCoringas(!expandedCoringas)}
+              className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors mb-4"
+            >
+              <h2 className="text-lg font-semibold text-gray-900">
+                Categorias Padrão
+              </h2>
+              {expandedCoringas ? (
+                <ChevronUp className="w-5 h-5 text-gray-600" />
               ) : (
-                categoriasFiltradas.map((categoria) => (
-                  <tr key={categoria.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4">
-                      <span className="text-sm font-medium text-gray-900">{categoria.nome}</span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="text-sm text-gray-600">
-                        {categoria.descricao || '-'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <button
-                        onClick={() => handleToggleStatus(categoria)}
-                        className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                          categoria.ativo
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {categoria.ativo ? 'Habilitado' : 'Desabilitado'}
-                      </button>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleEdit(categoria)}
-                          className="p-2 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(categoria.id)}
-                          className="p-2 text-gray-600 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                <ChevronDown className="w-5 h-5 text-gray-600" />
               )}
-            </tbody>
-          </table>
+            </button>
+            {expandedCoringas && (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Nome</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Descrição</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Situação</th>
+                      <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Tipo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoriasCoringas.map((categoria) => (
+                      <tr key={categoria.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">{categoria.nome}</span>
+                            <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                              Padrão
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-sm text-gray-600">
+                            {categoria.descricao || '-'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            categoria.ativo
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {categoria.ativo ? 'Habilitado' : 'Desabilitado'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="text-sm text-gray-500">Somente leitura</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tabela de Categorias Personalizadas - Sanfona */}
+        <div>
+          <button
+            onClick={() => setExpandedPersonalizadas(!expandedPersonalizadas)}
+            className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors mb-4"
+          >
+            <h2 className="text-lg font-semibold text-gray-900">
+              Suas Categorias Personalizadas
+            </h2>
+            {expandedPersonalizadas ? (
+              <ChevronUp className="w-5 h-5 text-gray-600" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-600" />
+            )}
+          </button>
+          {expandedPersonalizadas && (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Nome</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Descrição</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Situação</th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categoriasPersonalizadas.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="text-center py-8 text-gray-500">
+                        Nenhuma categoria personalizada encontrada. Clique em "Adicionar categoria" para criar uma.
+                      </td>
+                    </tr>
+                  ) : (
+                    categoriasPersonalizadas.map((categoria) => (
+                      <tr key={categoria.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4">
+                          <span className="text-sm font-medium text-gray-900">{categoria.nome}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-sm text-gray-600">
+                            {categoria.descricao || '-'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={() => handleToggleStatus(categoria)}
+                            className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                              categoria.ativo
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {categoria.ativo ? 'Habilitado' : 'Desabilitado'}
+                          </button>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleEdit(categoria)}
+                              className="p-2 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(categoria)}
+                              className="p-2 text-gray-600 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </Card>
 

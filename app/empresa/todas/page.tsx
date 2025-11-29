@@ -4,14 +4,19 @@ import { Card } from '@/components/ui/Card'
 import { Loading } from '@/components/ui/Loading'
 import { StatCard } from '@/components/ui/StatCard'
 import { formatCurrency } from '@/lib/utils'
-import { Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { Plus, ArrowUpRight, ArrowDownRight, Calendar, AlertCircle } from 'lucide-react'
 import { FinanceiroTable } from '@/components/FinanceiroTable'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/database.types'
 import { LancamentoModal } from '@/components/modals/LancamentoModal'
 
-type Lancamento = Database['public']['Tables']['financeiro_lancamentos']['Row']
+type Cliente = Database['public']['Tables']['clientes']['Row']
+
+type Lancamento = Database['public']['Tables']['financeiro_lancamentos']['Row'] & {
+  clientes?: Cliente | null
+}
+
 type ContaFinanceira = Database['public']['Tables']['contas_financeiras']['Row']
 type Transferencia = Database['public']['Tables']['transferencias_bancarias']['Row'] & {
   banco_origem?: ContaFinanceira | null
@@ -23,6 +28,8 @@ export default function TodasPage() {
   const [transferencias, setTransferencias] = useState<Transferencia[]>([])
   const [totalEntradas, setTotalEntradas] = useState(0)
   const [totalSaidas, setTotalSaidas] = useState(0)
+  const [previstoMes, setPrevistoMes] = useState(0)
+  const [atrasados, setAtrasados] = useState(0)
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -35,7 +42,7 @@ export default function TodasPage() {
     const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
 
     // Buscar todos os dados em paralelo
-    const [entradasResult, saidasResult, lancamentosResult, transferenciasResult] = await Promise.all([
+    const [entradasResult, saidasResult, previstoMesResult, atrasadosResult, lancamentosResult, transferenciasResult] = await Promise.all([
       supabase
         .from('financeiro_lancamentos')
         .select('valor')
@@ -50,9 +57,25 @@ export default function TodasPage() {
         .eq('status', 'pago')
         .gte('data_competencia', primeiroDiaMes.toISOString().split('T')[0])
         .lte('data_competencia', ultimoDiaMes.toISOString().split('T')[0]),
+      // Previsto para o Mês: todos os lançamentos com vencimento no mês atual
       supabase
         .from('financeiro_lancamentos')
-        .select('*')
+        .select('valor, tipo')
+        .not('data_vencimento', 'is', null)
+        .gte('data_vencimento', primeiroDiaMes.toISOString().split('T')[0])
+        .lte('data_vencimento', ultimoDiaMes.toISOString().split('T')[0]),
+      // Atrasados: buscar todos os lançamentos para filtrar depois
+      supabase
+        .from('financeiro_lancamentos')
+        .select('valor, status, data_vencimento')
+        .neq('status', 'cancelado'),
+      supabase
+        .from('financeiro_lancamentos')
+        .select(`
+          *,
+          clientes(id, nome),
+          financeiro_categorias(id, nome)
+        `)
         .order('created_at', { ascending: false })
         .limit(50),
       supabase
@@ -67,9 +90,34 @@ export default function TodasPage() {
 
     const entradas = entradasResult.data || []
     const saidas = saidasResult.data || []
+    const previstos = previstoMesResult.data || []
+    const atrasadosData = atrasadosResult.data || []
     
     setTotalEntradas(entradas.reduce((acc, item) => acc + Number(item.valor), 0))
     setTotalSaidas(saidas.reduce((acc, item) => acc + Number(item.valor), 0))
+    
+    // Calcular previsto para o mês (soma de entradas menos saídas previstas)
+    const previstoEntradasValor = previstos
+      .filter((item: any) => item.tipo === 'entrada')
+      .reduce((acc: number, item: any) => acc + Number(item.valor), 0)
+    const previstoSaidasValor = previstos
+      .filter((item: any) => item.tipo === 'saida')
+      .reduce((acc: number, item: any) => acc + Number(item.valor), 0)
+    setPrevistoMes(previstoEntradasValor - previstoSaidasValor)
+    
+    // Calcular atrasados: filtrar apenas os que realmente estão atrasados
+    const hojeStr = hoje.toISOString().split('T')[0]
+    const atrasadosFiltrados = atrasadosData.filter((item: any) => {
+      // Se tem status em_atraso, está atrasado
+      if (item.status === 'em_atraso') return true
+      // Se tem vencimento passado e não está pago, está atrasado
+      if (item.data_vencimento) {
+        const vencimentoStr = item.data_vencimento.split('T')[0]
+        if (vencimentoStr < hojeStr && item.status !== 'pago') return true
+      }
+      return false
+    })
+    setAtrasados(atrasadosFiltrados.reduce((acc: number, item: any) => acc + Number(item.valor), 0))
     
     if (lancamentosResult.data) {
       setLancamentos(lancamentosResult.data)
@@ -165,7 +213,7 @@ export default function TodasPage() {
       </div>
 
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <StatCard
           title="Entradas do Mês"
           value={formatCurrency(totalEntradas)}
@@ -182,6 +230,18 @@ export default function TodasPage() {
           title="Saldo do Mês"
           value={formatCurrency(saldo)}
           iconColor={saldo >= 0 ? 'text-green-600' : 'text-red-600'}
+        />
+        <StatCard
+          title="Previsto para o Mês"
+          value={formatCurrency(previstoMes)}
+          icon={Calendar}
+          iconColor="text-blue-600"
+        />
+        <StatCard
+          title="Atrasados"
+          value={formatCurrency(atrasados)}
+          icon={AlertCircle}
+          iconColor="text-orange-600"
         />
       </div>
 

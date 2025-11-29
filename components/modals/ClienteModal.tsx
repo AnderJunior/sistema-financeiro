@@ -132,42 +132,6 @@ export function ClienteModal({ isOpen, onClose, onSuccess, cliente }: ClienteMod
     }
 
     if (!error && newClienteId) {
-      // Criar/atualizar cliente no Asaas automaticamente
-      try {
-        const response = await fetch('/api/asaas/create-customer', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ clienteId: newClienteId }),
-        })
-
-        const result = await response.json()
-        
-        if (!response.ok) {
-          // Se for erro de campo obrigatório, mostra alerta mais específico
-          if (result.isRequiredFieldError) {
-            await alert(
-              `Cliente ${isEditMode ? 'atualizado' : 'criado'} no sistema, mas não foi possível ${isEditMode ? 'atualizar' : 'criar'} no Asaas.\n\n` +
-              `Erro: ${result.error}\n\n` +
-              `${result.hint || ''}\n\n` +
-              `Você pode editar o cliente depois e adicionar os dados faltantes.`,
-              'Aviso'
-            )
-          } else {
-            // Outros erros: mostra aviso mas não bloqueia
-            console.warn(`Cliente ${isEditMode ? 'atualizado' : 'criado'} no sistema mas erro ao ${isEditMode ? 'atualizar' : 'criar'} no Asaas:`, result.error)
-            if (isEditMode) {
-              // Em modo de edição, mostra aviso mais discreto
-              console.warn('Aviso: Cliente atualizado no sistema, mas pode não ter sido sincronizado com o Asaas.')
-            }
-          }
-        }
-      } catch (asaasError: any) {
-        // Não bloqueia o cadastro se houver erro no Asaas
-        console.warn('Erro ao criar cliente no Asaas:', asaasError.message)
-      }
-
       // Reset form
       setFormData({
         nome: '',

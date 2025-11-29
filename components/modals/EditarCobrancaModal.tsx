@@ -8,8 +8,6 @@ import { useModal } from '@/contexts/ModalContext'
 
 type Lancamento = Database['public']['Tables']['financeiro_lancamentos']['Row'] & {
   servicos?: Database['public']['Tables']['servicos']['Row']
-  asaas_subscription_id?: string | null
-  asaas_payment_id?: string | null
 }
 
 interface EditarCobrancaModalProps {
@@ -196,54 +194,6 @@ export function EditarCobrancaModal({ isOpen, onClose, onSuccess, cobranca }: Ed
       return
     }
 
-    // Atualizar no Asaas se houver ID do Asaas
-    if (cobranca.asaas_subscription_id || cobranca.asaas_payment_id) {
-      try {
-        const updateData: any = {
-          lancamentoId: cobranca.id,
-          descricao: formData.descricao,
-        }
-
-        if (isAssinatura) {
-          if (formData.data_proxima_assinatura) {
-            updateData.dataProximaAssinatura = formData.data_proxima_assinatura
-          }
-          if (formData.unidade_cobranca) {
-            updateData.unidadeCobranca = formData.unidade_cobranca
-          }
-        } else {
-          if (formData.data_vencimento) {
-            updateData.dataVencimento = formData.data_vencimento
-          }
-          if (formData.valor) {
-            updateData.valor = parseCurrencyValue(formData.valor)
-          }
-        }
-
-        const response = await fetch('/api/asaas/update-charge', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(updateData),
-        })
-
-        const result = await response.json()
-        
-        if (!response.ok) {
-          // Se o erro for porque não está vinculado ao Asaas, apenas avisa
-          if (result.skipAsaas) {
-            console.warn('Cobrança atualizada no sistema, mas não foi possível atualizar no Asaas:', result.error)
-          } else {
-            console.warn('Erro ao atualizar cobrança/assinatura no Asaas:', result.error)
-          }
-        }
-      } catch (asaasError: any) {
-        // Não bloqueia a atualização se houver erro no Asaas
-        console.warn('Erro ao atualizar cobrança/assinatura no Asaas:', asaasError.message)
-      }
-    }
-
     onSuccess?.()
     onClose()
     setLoading(false)
@@ -291,11 +241,6 @@ export function EditarCobrancaModal({ isOpen, onClose, onSuccess, cobranca }: Ed
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="R$ 0,00"
           />
-          {isAssinatura && (
-            <p className="text-xs text-gray-500 mt-1">
-              O valor não será atualizado no Asaas (apenas no sistema)
-            </p>
-          )}
         </div>
 
         <div>
@@ -342,7 +287,7 @@ export function EditarCobrancaModal({ isOpen, onClose, onSuccess, cobranca }: Ed
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Data de vencimento da próxima fatura no Asaas
+                Data de vencimento da próxima fatura
               </p>
             </div>
 

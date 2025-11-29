@@ -164,7 +164,7 @@ export function ClientesKanban({ clientes: initialClientes, viewMode, onViewMode
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     const confirmed = await confirm(
-      'Tem certeza que deseja excluir este cliente? Esta ação também excluirá o cliente no Asaas.',
+      'Tem certeza que deseja excluir este cliente? Esta ação excluirá o cliente do sistema.',
       'Confirmar exclusão',
       'Excluir',
       'Cancelar',
@@ -173,41 +173,6 @@ export function ClientesKanban({ clientes: initialClientes, viewMode, onViewMode
     if (!confirmed) return
 
     const supabase = createClient()
-    
-    // Primeiro, tenta excluir no Asaas
-    try {
-      const response = await fetch('/api/asaas/delete-customer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ clienteId: id }),
-      })
-
-      const result = await response.json()
-      
-      if (!response.ok) {
-        const shouldContinue = await confirm(
-          `Erro ao excluir cliente no Asaas: ${result.error}\n\n` +
-          `Deseja continuar e excluir apenas no sistema?`,
-          'Erro ao excluir no Asaas'
-        )
-        
-        if (!shouldContinue) {
-          return
-        }
-      }
-    } catch (error: any) {
-      const shouldContinue = await confirm(
-        `Erro ao comunicar com o Asaas: ${error.message}\n\n` +
-        `Deseja continuar e excluir apenas no sistema?`,
-        'Erro de comunicação'
-      )
-      
-      if (!shouldContinue) {
-        return
-      }
-    }
 
     // Exclui no banco de dados
     const { error } = await supabase

@@ -46,6 +46,13 @@ export function CategoriaModal({ isOpen, onClose, onSuccess, categoria, tipo }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Não permitir editar categorias coringas
+    if (isEditMode && categoria?.is_coringa) {
+      await alert('Não é possível editar categorias coringas (padrão do sistema).', 'Aviso')
+      return
+    }
+
     setLoading(true)
 
     const supabase = createClient()
@@ -54,6 +61,7 @@ export function CategoriaModal({ isOpen, onClose, onSuccess, categoria, tipo }: 
       nome: formData.nome,
       descricao: formData.descricao || null,
       ativo: formData.ativo,
+      is_coringa: false, // Sempre false para categorias criadas/editadas pelo usuário
     }
 
     let error

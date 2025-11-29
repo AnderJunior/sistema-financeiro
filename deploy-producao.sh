@@ -98,8 +98,6 @@ else
     echo -e "  NEXT_PUBLIC_SUPABASE_URL=..."
     echo -e "  NEXT_PUBLIC_SUPABASE_ANON_KEY=..."
     echo -e "  SUPABASE_SERVICE_ROLE_KEY=..."
-    echo -e "  ASAAS_API_TOKEN=..."
-    echo -e "  NEXT_PUBLIC_ASAAS_ENVIRONMENT=production"
     echo ""
     read -p "Pressione Enter após criar o .env na VPS, ou Ctrl+C para cancelar..."
 fi
@@ -112,7 +110,6 @@ ssh ${VPS_USER}@${VPS_IP} "cd ${VPS_PATH} && \
   docker build \
     --build-arg NEXT_PUBLIC_SUPABASE_URL=\"\${NEXT_PUBLIC_SUPABASE_URL}\" \
     --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=\"\${NEXT_PUBLIC_SUPABASE_ANON_KEY}\" \
-    --build-arg NEXT_PUBLIC_ASAAS_ENVIRONMENT=\"\${NEXT_PUBLIC_ASAAS_ENVIRONMENT:-production}\" \
     -t ${IMAGE_NAME} ."
 
 if [ $? -eq 0 ]; then

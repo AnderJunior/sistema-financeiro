@@ -188,7 +188,7 @@ export function DataReferencePicker({
         },
         headers: {
           'content-type': 'application/json',
-          'user-agent': 'Asaas_Hmlg/3.0',
+          'user-agent': 'SistemaFinanceiro/1.0',
           'host': 'webhook.eaivendeu.com.br'
         }
       }

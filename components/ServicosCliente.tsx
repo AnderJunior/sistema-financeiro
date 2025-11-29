@@ -9,7 +9,6 @@ import { Database } from '@/types/database.types'
 import { Modal } from '@/components/ui/Modal'
 import { useModal } from '@/contexts/ModalContext'
 import { verificarServicosAtrasados } from '@/lib/utils/notificacoes-servicos'
-import { getPrimeiraColunaKanbanId } from '@/lib/utils/kanban'
 
 type Servico = Database['public']['Tables']['servicos']['Row']
 type Projeto = Database['public']['Tables']['projetos']['Row']
@@ -80,13 +79,6 @@ export function ServicosCliente({ clienteId, onDataChange }: ServicosClienteProp
     loadServicosDisponiveis()
   }, [clienteId, loadServicos, loadServicosDisponiveis])
 
-  const servicosUnicos = servicos.reduce((acc: Lancamento[], lancamento) => {
-    if (lancamento.servico_id && !acc.find(s => s.servico_id === lancamento.servico_id)) {
-      acc.push(lancamento)
-    }
-    return acc
-  }, [])
-
   if (loading) {
     return (
       <Card title="Projetos">
@@ -110,15 +102,15 @@ export function ServicosCliente({ clienteId, onDataChange }: ServicosClienteProp
             </button>
           }
         >
-        {servicosUnicos.length === 0 ? (
+        {servicos.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             Nenhum projeto encontrado
           </div>
         ) : (
           <div className="space-y-3">
-            {servicosUnicos.map((lancamento) => (
+            {servicos.map((lancamento) => (
               <ServicoCard
-                key={`${lancamento.servico_id}-${lancamento.id}`}
+                key={lancamento.id}
                 lancamento={lancamento}
                 onStatusChange={() => loadServicos()}
                 onDelete={() => loadServicos()}
@@ -196,12 +188,11 @@ function ServicoCard({ lancamento, onStatusChange, onDelete }: ServicoCardProps)
     setUpdating(true)
     const supabase = createClient()
     
-    // Atualizar todos os lançamentos relacionados ao mesmo serviço
+    // Atualizar apenas este lançamento específico (cada projeto tem seu próprio status)
     const { error } = await supabase
       .from('financeiro_lancamentos')
       .update({ status_servico: colunaId })
-      .eq('servico_id', lancamento.servico_id)
-      .eq('cliente_id', lancamento.cliente_id)
+      .eq('id', lancamento.id)
 
     if (!error) {
       setStatus(colunaId)
@@ -220,7 +211,7 @@ function ServicoCard({ lancamento, onStatusChange, onDelete }: ServicoCardProps)
 
   const handleDelete = async () => {
     const confirmed = await confirm(
-      'Tem certeza que deseja excluir este projeto? Isso excluirá todas as cobranças e histórico financeiro relacionado a este projeto, incluindo as cobranças/assinaturas no Asaas.',
+      'Tem certeza que deseja excluir este projeto? Isso excluirá todas as cobranças e histórico financeiro relacionado a este projeto.',
       'Confirmar exclusão',
       'Excluir',
       'Cancelar',
@@ -232,58 +223,12 @@ function ServicoCard({ lancamento, onStatusChange, onDelete }: ServicoCardProps)
 
     setDeleting(true)
     const supabase = createClient()
-    
-    // Primeiro, tenta excluir as cobranças/assinaturas no Asaas
-    try {
-      const response = await fetch('/api/asaas/delete-charge', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          servicoId: lancamento.servico_id,
-          clienteId: lancamento.cliente_id 
-        }),
-      })
 
-      const result = await response.json()
-      
-      if (!response.ok) {
-        // Se houver erro ao excluir no Asaas, pergunta se deseja continuar
-        const shouldContinue = await confirm(
-          `Erro ao excluir cobranças/assinaturas no Asaas: ${result.error}\n\n` +
-          `Deseja continuar e excluir apenas no sistema?`,
-          'Erro ao excluir no Asaas'
-        )
-        
-        if (!shouldContinue) {
-          setDeleting(false)
-          return
-        }
-      } else if (result.errors && result.errors.length > 0) {
-        // Se houver alguns erros, avisa mas continua
-        console.warn('Alguns erros ao excluir no Asaas:', result.errors)
-      }
-    } catch (error: any) {
-      // Se houver erro na chamada da API, pergunta se deseja continuar
-      const shouldContinue = await confirm(
-        `Erro ao comunicar com o Asaas: ${error.message}\n\n` +
-        `Deseja continuar e excluir apenas no sistema?`,
-        'Erro de comunicação'
-      )
-      
-      if (!shouldContinue) {
-        setDeleting(false)
-        return
-      }
-    }
-
-    // Excluir todos os lançamentos relacionados ao serviço deste cliente
+    // Excluir apenas este lançamento específico (cada projeto é independente)
     const { error } = await supabase
       .from('financeiro_lancamentos')
       .delete()
-      .eq('servico_id', lancamento.servico_id)
-      .eq('cliente_id', lancamento.cliente_id)
+      .eq('id', lancamento.id)
 
     if (!error) {
       onDelete()
@@ -496,10 +441,9 @@ function AdicionarServicoModal({
     data_proxima_assinatura: '',
     descricao: '',
     status_servico: '',
-    criarCobrancaAutomaticamente: true,
   })
 
-  // Buscar colunas do kanban
+  // Buscar colunas do kanban quando o modal abrir
   useEffect(() => {
     async function loadColunasKanban() {
       const supabase = createClient()
@@ -511,8 +455,8 @@ function AdicionarServicoModal({
 
       if (data) {
         setColunasKanban(data as KanbanColuna[])
-        // Definir primeira coluna como padrão
-        if (data.length > 0 && !formData.status_servico) {
+        // Se houver colunas, definir a primeira como padrão
+        if (data.length > 0) {
           setFormData(prev => ({ ...prev, status_servico: data[0].id }))
         }
       }
@@ -537,7 +481,6 @@ function AdicionarServicoModal({
         data_proxima_assinatura: '',
         descricao: '',
         status_servico: primeiraColunaId,
-        criarCobrancaAutomaticamente: true,
       })
     }
   }, [isOpen, colunasKanban])
@@ -554,6 +497,8 @@ function AdicionarServicoModal({
     setLoading(true)
 
     const supabase = createClient()
+    // Obter usuário atual para buscar categorias coringas + categorias do usuário
+    const { data: { user } } = await supabase.auth.getUser()
     
     // Buscar categoria de entrada padrão ou criar
     const { data: categoria } = await supabase
@@ -561,26 +506,16 @@ function AdicionarServicoModal({
       .select('id')
       .eq('tipo', 'entrada')
       .eq('ativo', true)
+      .or(`is_coringa.eq.true${user?.id ? ',user_id.eq.' + user.id : ''}`)
+      .order('is_coringa', { ascending: false })
       .limit(1)
       .single()
 
-    // Usar o status_servico selecionado no formulário ou a primeira coluna como fallback
-    let statusServicoId = formData.status_servico
-    
-    if (!statusServicoId && colunasKanban.length > 0) {
-      statusServicoId = colunasKanban[0].id
-    }
-    
-    if (!statusServicoId) {
-      // Fallback: buscar primeira coluna do kanban
-      const primeiraColunaId = await getPrimeiraColunaKanbanId()
-      if (!primeiraColunaId) {
-        await alert('Não foi possível encontrar uma coluna no kanban. Verifique se as colunas do kanban estão configuradas.', 'Erro')
-        setLoading(false)
-        return
-      }
-      statusServicoId = primeiraColunaId
-    }
+    // Se houver colunas no kanban, usar o status selecionado
+    // Caso contrário, criar sem status (null) - será exibido como "Não atribuído"
+    const statusServicoId = colunasKanban.length > 0 && formData.status_servico 
+      ? formData.status_servico 
+      : null
 
     // Se for assinatura, usar data_proxima_assinatura como data_vencimento da cobrança
     // Caso contrário, usar data_vencimento normal
@@ -649,32 +584,6 @@ function AdicionarServicoModal({
         }
       }
 
-      // Criar cobrança/assinatura no Asaas apenas se o usuário optou por isso
-      if (formData.criarCobrancaAutomaticamente) {
-        try {
-          const response = await fetch('/api/asaas/create-charge', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ lancamentoId: insertedData.id }),
-          })
-
-          const result = await response.json()
-          
-          if (!response.ok) {
-            // Se o erro for porque o cliente não está no Asaas, apenas avisa
-            if (result.skipAsaas) {
-              console.warn('Projeto adicionado no sistema, mas não foi possível criar no Asaas:', result.error)
-            } else {
-              console.warn('Erro ao criar cobrança/assinatura no Asaas:', result.error)
-            }
-          }
-        } catch (asaasError: any) {
-          // Não bloqueia a criação do projeto se houver erro no Asaas
-          console.warn('Erro ao criar cobrança/assinatura no Asaas:', asaasError.message)
-        }
-      }
 
       const primeiraColunaId = colunasKanban.length > 0 ? colunasKanban[0].id : ''
       setFormData({
@@ -684,7 +593,6 @@ function AdicionarServicoModal({
         data_proxima_assinatura: '',
         descricao: '',
         status_servico: primeiraColunaId,
-        criarCobrancaAutomaticamente: true,
       })
       onSuccess()
     } else {
@@ -795,61 +703,30 @@ function AdicionarServicoModal({
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Status do Projeto *
-          </label>
-          <select
-            required
-            value={formData.status_servico || colunasKanban[0]?.id || ''}
-            onChange={(e) => setFormData({ ...formData, status_servico: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          >
-            {colunasKanban.map((coluna) => (
-              <option key={coluna.id} value={coluna.id}>
-                {coluna.nome}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            Selecione a etapa atual do projeto
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Criar cobrança automaticamente
-          </label>
-          <div className="relative inline-flex rounded-lg border border-gray-300 overflow-hidden shadow-sm">
-            <button
-              type="button"
-              onClick={() => setFormData({ ...formData, criarCobrancaAutomaticamente: true })}
-              className={`px-6 py-2.5 text-sm font-medium transition-all duration-200 ${
-                formData.criarCobrancaAutomaticamente
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
+        {/* Campo de status do projeto - só aparece se houver colunas cadastradas no kanban */}
+        {colunasKanban.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Status do Projeto *
+            </label>
+            <select
+              required
+              value={formData.status_servico || colunasKanban[0]?.id || ''}
+              onChange={(e) => setFormData({ ...formData, status_servico: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
-              Sim
-            </button>
-            <button
-              type="button"
-              onClick={() => setFormData({ ...formData, criarCobrancaAutomaticamente: false })}
-              className={`px-6 py-2.5 text-sm font-medium transition-all duration-200 border-l border-gray-300 ${
-                !formData.criarCobrancaAutomaticamente
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Não
-            </button>
+              {colunasKanban.map((coluna) => (
+                <option key={coluna.id} value={coluna.id}>
+                  {coluna.nome}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Selecione a etapa atual do projeto
+            </p>
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            {formData.criarCobrancaAutomaticamente
-              ? 'A cobrança/assinatura será criada no Asaas automaticamente'
-              : 'A cobrança/assinatura será criada apenas no sistema, sem integração com o Asaas'}
-          </p>
-        </div>
+        )}
+
 
         <div className="flex gap-4 pt-4 border-t border-gray-200">
           <button

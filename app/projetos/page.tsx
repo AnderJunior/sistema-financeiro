@@ -48,34 +48,8 @@ export default function ProjetosPage() {
     const { data, error } = await query
 
     if (!error && data) {
-      // Agrupar por servico_id e cliente_id para ter projetos únicos
-      // Garantir que TODOS os serviços apareçam, incluindo assinaturas
-      // Priorizar lançamentos com status_servico definido, depois o mais recente
-      const projetosUnicos = new Map<string, Lancamento>()
-      
-      data.forEach((lancamento: any) => {
-        const key = `${lancamento.servico_id}-${lancamento.cliente_id}`
-        
-        if (!projetosUnicos.has(key)) {
-          // Primeira ocorrência: adicionar diretamente
-          projetosUnicos.set(key, lancamento)
-        } else {
-          // Já existe um lançamento para este serviço/cliente
-          const existente = projetosUnicos.get(key)!
-          
-          // Priorizar lançamento com status_servico definido
-          // Se o novo tem status e o existente não, substituir
-          if (lancamento.status_servico && !existente.status_servico) {
-            projetosUnicos.set(key, lancamento)
-          } 
-          // Se ambos têm status, manter o mais recente (já está ordenado por created_at DESC)
-          // Se nenhum tem status, também manter o mais recente
-          // Como os dados já estão ordenados por created_at DESC, o primeiro é o mais recente
-        }
-      })
-      
-      // Converter para array - todos os serviços únicos (servico_id + cliente_id) estarão presentes
-      setProjetos(Array.from(projetosUnicos.values()) as Lancamento[])
+      // Mostrar TODOS os projetos, mesmo que sejam do mesmo serviço/cliente
+      setProjetos(data as Lancamento[])
     }
     setLoading(false)
   }

@@ -44,7 +44,7 @@ export default function NovoLancamentoPage() {
       const [catRes, contRes, cliRes, projRes, gruRes, servRes] = await Promise.all([
         supabase.from('financeiro_categorias').select('*').eq('ativo', true),
         supabase.from('contas_financeiras').select('*').eq('ativo', true),
-        supabase.from('clientes').select('*').eq('status', 'ativo'),
+        supabase.from('clientes').select('*').order('nome', { ascending: true }),
         supabase.from('projetos').select('*').eq('status', 'em_andamento'),
         supabase.from('grupos').select('*').eq('status', 'ativo'),
         supabase.from('servicos').select('*').eq('ativo', true),

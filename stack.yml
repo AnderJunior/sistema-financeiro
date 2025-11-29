@@ -11,7 +11,6 @@ services:
     #   args:
     #     - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
     #     - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-    #     - NEXT_PUBLIC_ASAAS_ENVIRONMENT=${NEXT_PUBLIC_ASAAS_ENVIRONMENT:-production}
 
     networks:
       - REDE_INTERNA ## Nome da rede interna
@@ -26,10 +25,6 @@ services:
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      
-      ## Configurações do Asaas (opcional)
-      - ASAAS_API_TOKEN=${ASAAS_API_TOKEN}
-      - NEXT_PUBLIC_ASAAS_ENVIRONMENT=${NEXT_PUBLIC_ASAAS_ENVIRONMENT:-production}
       
     deploy:
       mode: replicated

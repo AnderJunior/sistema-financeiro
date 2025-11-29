@@ -5,11 +5,17 @@ import { Database } from '@/types/database.types'
 import { Edit, Trash2, ArrowUpRight, ArrowDownRight, Copy, ArrowRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import Link from 'next/link'
 import { useModal } from '@/contexts/ModalContext'
+import { LancamentoModal } from '@/components/modals/LancamentoModal'
+
+type Cliente = Database['public']['Tables']['clientes']['Row']
+
+type Categoria = Database['public']['Tables']['financeiro_categorias']['Row']
 
 type Lancamento = Database['public']['Tables']['financeiro_lancamentos']['Row'] & {
   invoice_url?: string | null
+  clientes?: Cliente | null
+  financeiro_categorias?: Categoria | null
 }
 
 type ContaFinanceira = Database['public']['Tables']['contas_financeiras']['Row']
@@ -28,11 +34,30 @@ export function FinanceiroTable({ lancamentos: initialLancamentos, transferencia
   const { alert, confirm } = useModal()
   const [lancamentos, setLancamentos] = useState(initialLancamentos)
   const [filter, setFilter] = useState<'all' | 'entrada' | 'saida' | 'transferencia'>('all')
+  const [editingLancamento, setEditingLancamento] = useState<Lancamento | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
   // Sincronizar com mudanças do parent component
   useEffect(() => {
     setLancamentos(initialLancamentos)
   }, [initialLancamentos])
+
+  const handleEdit = (lancamento: Lancamento) => {
+    setEditingLancamento(lancamento)
+    setIsEditModalOpen(true)
+  }
+
+  const handleEditSuccess = () => {
+    setIsEditModalOpen(false)
+    setEditingLancamento(null)
+    // Recarregar a página para atualizar os dados
+    window.location.reload()
+  }
+
+  const handleEditClose = () => {
+    setIsEditModalOpen(false)
+    setEditingLancamento(null)
+  }
 
   const filteredLancamentos = filter === 'all'
     ? lancamentos
@@ -231,8 +256,8 @@ export function FinanceiroTable({ lancamentos: initialLancamentos, transferencia
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Tipo</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Descrição</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Cliente</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Categoria</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Data</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Vencimento</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Status</th>
@@ -251,19 +276,20 @@ export function FinanceiroTable({ lancamentos: initialLancamentos, transferencia
                 filteredLancamentos.map((lancamento) => (
                   <tr key={lancamento.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-4">
-                      {lancamento.tipo === 'entrada' ? (
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        {lancamento.tipo === 'entrada' ? (
                           <ArrowUpRight className="w-4 h-4 text-green-600" />
-                          <span className="text-sm text-gray-700">Entrada</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
+                        ) : (
                           <ArrowDownRight className="w-4 h-4 text-red-600" />
-                          <span className="text-sm text-gray-700">Saída</span>
-                        </div>
-                      )}
+                        )}
+                        <span className="text-sm text-gray-600">
+                          {lancamento.clientes?.nome || '-'}
+                        </span>
+                      </div>
                     </td>
-                    <td className="py-3 px-4 text-sm text-gray-700">{lancamento.descricao}</td>
+                    <td className="py-3 px-4 text-sm text-gray-700">
+                      {lancamento.financeiro_categorias?.nome || '-'}
+                    </td>
                     <td className="py-3 px-4 text-sm text-gray-600">
                       {formatDate(lancamento.data_competencia)}
                     </td>
@@ -294,13 +320,13 @@ export function FinanceiroTable({ lancamentos: initialLancamentos, transferencia
                             <Copy className="w-4 h-4" />
                           </button>
                         )}
-                        <Link
-                          href={`/empresa/${lancamento.id}/editar`}
+                        <button
+                          onClick={() => handleEdit(lancamento)}
                           className="p-2 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
                           title="Editar"
                         >
                           <Edit className="w-4 h-4" />
-                        </Link>
+                        </button>
                         <button
                           onClick={() => handleDelete(lancamento.id)}
                           className="p-2 text-gray-600 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -317,6 +343,13 @@ export function FinanceiroTable({ lancamentos: initialLancamentos, transferencia
           </table>
         </div>
       )}
+
+      <LancamentoModal
+        isOpen={isEditModalOpen}
+        onClose={handleEditClose}
+        onSuccess={handleEditSuccess}
+        lancamento={editingLancamento}
+      />
     </div>
   )
 }

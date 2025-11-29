@@ -101,7 +101,7 @@ export function ClientesTable({ clientes: initialClientes, viewMode, onViewModeC
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm(
-      'Tem certeza que deseja excluir este cliente? Esta ação também excluirá o cliente no Asaas.',
+      'Tem certeza que deseja excluir este cliente? Esta ação excluirá o cliente do sistema.',
       'Confirmar exclusão',
       'Excluir',
       'Cancelar',
@@ -110,43 +110,6 @@ export function ClientesTable({ clientes: initialClientes, viewMode, onViewModeC
     if (!confirmed) return
 
     const supabase = createClient()
-    
-    // Primeiro, tenta excluir no Asaas
-    try {
-      const response = await fetch('/api/asaas/delete-customer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ clienteId: id }),
-      })
-
-      const result = await response.json()
-      
-      if (!response.ok) {
-        // Se houver erro ao excluir no Asaas, pergunta se deseja continuar
-        const shouldContinue = await confirm(
-          `Erro ao excluir cliente no Asaas: ${result.error}\n\n` +
-          `Deseja continuar e excluir apenas no sistema?`,
-          'Erro ao excluir no Asaas'
-        )
-        
-        if (!shouldContinue) {
-          return
-        }
-      }
-    } catch (error: any) {
-      // Se houver erro na chamada da API, pergunta se deseja continuar
-      const shouldContinue = await confirm(
-        `Erro ao comunicar com o Asaas: ${error.message}\n\n` +
-        `Deseja continuar e excluir apenas no sistema?`,
-        'Erro de comunicação'
-      )
-      
-      if (!shouldContinue) {
-        return
-      }
-    }
 
     // Exclui no banco de dados
     const { error } = await supabase

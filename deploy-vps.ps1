@@ -131,8 +131,6 @@ if ($envCheck -eq "exists") {
     Write-Host "    NEXT_PUBLIC_SUPABASE_URL=..."
     Write-Host "    NEXT_PUBLIC_SUPABASE_ANON_KEY=..."
     Write-Host "    SUPABASE_SERVICE_ROLE_KEY=..."
-    Write-Host "    ASAAS_API_TOKEN=..."
-    Write-Host "    NEXT_PUBLIC_ASAAS_ENVIRONMENT=production"
     Write-Host ""
     $continue = Read-Host "Pressione Enter após criar o .env na VPS, ou Ctrl+C para cancelar"
 }
@@ -148,7 +146,6 @@ source .env 2>/dev/null || true && ``
 docker build ``
   --build-arg NEXT_PUBLIC_SUPABASE_URL="`${NEXT_PUBLIC_SUPABASE_URL}" ``
   --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="`${NEXT_PUBLIC_SUPABASE_ANON_KEY}" ``
-  --build-arg NEXT_PUBLIC_ASAAS_ENVIRONMENT="`${NEXT_PUBLIC_ASAAS_ENVIRONMENT:-production}" ``
   -t sistema-financeiro:latest .
 "@
 

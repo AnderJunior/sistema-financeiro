@@ -6,7 +6,6 @@ import { Loading } from '@/components/ui/Loading'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { HistoricoFinanceiro } from '@/components/HistoricoFinanceiro'
 import { ServicosCliente } from '@/components/ServicosCliente'
 import { CobrancasCliente } from '@/components/CobrancasCliente'
 import { GruposCliente } from '@/components/GruposCliente'
@@ -178,9 +177,6 @@ export default function ClienteDetailPage({ params }: { params: { id: string } }
 
           {/* Cobranças Ativas */}
           <CobrancasCliente clienteId={cliente.id} />
-
-          {/* Histórico Financeiro */}
-          <HistoricoFinanceiro clienteId={cliente.id} />
         </div>
 
         <div className="space-y-6">

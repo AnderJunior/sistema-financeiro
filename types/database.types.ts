@@ -198,6 +198,8 @@ export interface Database {
           nome: string
           descricao: string | null
           ativo: boolean
+          is_coringa: boolean
+          user_id: string | null
           created_at: string
           updated_at: string
         }
@@ -207,12 +209,16 @@ export interface Database {
           nome: string
           descricao?: string | null
           ativo?: boolean
+          is_coringa?: boolean
+          user_id?: string | null
         }
         Update: {
           tipo?: 'entrada' | 'saida'
           nome?: string
           descricao?: string | null
           ativo?: boolean
+          is_coringa?: boolean
+          user_id?: string | null
         }
       }
       contas_financeiras: {

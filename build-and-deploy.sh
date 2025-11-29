@@ -38,7 +38,6 @@ echo -e "${YELLOW}1. Fazendo build da imagem Docker...${NC}"
 docker build \
     --build-arg NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL}" \
     --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY}" \
-    --build-arg NEXT_PUBLIC_ASAAS_ENVIRONMENT="${NEXT_PUBLIC_ASAAS_ENVIRONMENT:-production}" \
     -t ${IMAGE_NAME}:${VERSION} \
     -t ${IMAGE_NAME}:latest \
     .

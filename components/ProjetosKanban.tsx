@@ -185,14 +185,13 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
           
           // Verificar se o status_servico realmente mudou
           if (updatedLancamento.status_servico !== oldLancamento?.status_servico) {
-            if (updatedLancamento.servico_id && updatedLancamento.cliente_id) {
+            if (updatedLancamento.id) {
               // Atualizar estado imediatamente usando o payload
               // Preservar dados financeiros existentes ao atualizar apenas o status
               setProjetos(prevProjetos => {
-                // Atualizar todos os projetos com o mesmo servico_id e cliente_id
+                // Atualizar apenas o lançamento específico pelo ID
                 return prevProjetos.map(p =>
-                  (p.servico_id === updatedLancamento.servico_id && 
-                   p.cliente_id === updatedLancamento.cliente_id)
+                  p.id === updatedLancamento.id
                     ? { ...p, status_servico: updatedLancamento.status_servico }
                     : p
                 )
@@ -205,14 +204,16 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
 
     // Listener para eventos customizados de outros componentes
     const handleCustomEvent = (e: CustomEvent) => {
-      const { servicoId, clienteId, newStatus } = e.detail
-      setProjetos(prevProjetos => 
-        prevProjetos.map(p => 
-          (p.servico_id === servicoId && p.cliente_id === clienteId)
-            ? { ...p, status_servico: newStatus }
-            : p
+      const { lancamentoId, newStatus } = e.detail
+      if (lancamentoId) {
+        setProjetos(prevProjetos => 
+          prevProjetos.map(p => 
+            p.id === lancamentoId
+              ? { ...p, status_servico: newStatus }
+              : p
+          )
         )
-      )
+      }
     }
 
     window.addEventListener('projetoStatusChanged', handleCustomEvent as EventListener)
@@ -280,8 +281,7 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
   // Agrupar projetos por coluna usando o ID da coluna como status
   // Cada coluna tem seu próprio status único (ID da coluna)
   // Projetos aparecem apenas na coluna cujo ID corresponde ao seu status_servico
-  // Projetos sem status_servico aparecem na primeira coluna (geralmente "Pendente")
-  const primeiraColunaId = colunas.length > 0 ? colunas[0].id : null
+  // Projetos sem status_servico aparecem em uma coluna especial "Não atribuído"
   const projetosPorColuna = colunas.reduce((acc, coluna) => {
     // Agrupar projetos onde o status_servico é exatamente o ID desta coluna
     const projetosNaColuna = filteredProjetos.filter(projeto => {
@@ -291,17 +291,24 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
     return acc
   }, {} as Record<string, Lancamento[]>)
   
-  // Adicionar projetos sem status_servico à primeira coluna
-  if (primeiraColunaId) {
-    const projetosSemStatus = filteredProjetos.filter(projeto => 
-      !projeto.status_servico || projeto.status_servico === null
-    )
-    if (projetosSemStatus.length > 0) {
-      if (!projetosPorColuna[primeiraColunaId]) {
-        projetosPorColuna[primeiraColunaId] = []
-      }
-      projetosPorColuna[primeiraColunaId].push(...projetosSemStatus)
-    }
+  // Filtrar projetos sem status para exibir em coluna especial "Não atribuído"
+  const projetosSemStatus = filteredProjetos.filter(projeto => 
+    !projeto.status_servico || projeto.status_servico === null
+  )
+  
+  // Criar coluna virtual "Não atribuído" se houver projetos sem status
+  const colunaNaoAtribuido: KanbanColuna | null = projetosSemStatus.length > 0 ? {
+    id: '__nao_atribuido__',
+    nome: 'Não atribuído',
+    cor: '#9CA3AF', // Cor cinza
+    ordem: -1, // Ordem especial para aparecer primeiro
+    ativo: true,
+    status_servico: null,
+  } : null
+  
+  // Adicionar projetos sem status à coluna "Não atribuído"
+  if (colunaNaoAtribuido && projetosSemStatus.length > 0) {
+    projetosPorColuna[colunaNaoAtribuido.id] = projetosSemStatus
   }
 
 
@@ -314,8 +321,8 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
     }
     
     setIsDragging(true)
-    // Usar um separador único que não aparece em UUIDs para evitar problemas com split
-    const projetoKey = `${projeto.servico_id}|||${projeto.cliente_id}`
+    // Usar o ID do lançamento como chave única (cada projeto é independente)
+    const projetoKey = projeto.id
     setDraggedProjetoId(projetoKey)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/html', projetoKey)
@@ -351,22 +358,21 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
     setDragOverColunaId(null)
     setIsDragging(false)
     
-    const projetoKey = draggedProjetoId || e.dataTransfer.getData('text/html')
-    
-    if (!projetoKey) {
-      setDraggedProjetoId(null)
-      return
-    }
-
-    // Separar servicoId e clienteId usando o separador único
-    const [servicoId, clienteId] = projetoKey.split('|||')
-    
-    if (!servicoId || !clienteId) {
+    // Não permitir drop na coluna "Não atribuído" - usuário deve arrastar para uma coluna configurada
+    if (coluna.id === '__nao_atribuido__') {
       setDraggedProjetoId(null)
       return
     }
     
-    const projeto = projetos.find(p => p.servico_id === servicoId && p.cliente_id === clienteId)
+    const projetoId = draggedProjetoId || e.dataTransfer.getData('text/html')
+    
+    if (!projetoId) {
+      setDraggedProjetoId(null)
+      return
+    }
+    
+    // Buscar projeto pelo ID do lançamento
+    const projeto = projetos.find(p => p.id === projetoId)
     
     if (!projeto) {
       setDraggedProjetoId(null)
@@ -383,28 +389,24 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
     // Preservar dados financeiros ao atualizar apenas o status
     setProjetos(prevProjetos => 
       prevProjetos.map(p => 
-        (p.servico_id === servicoId && p.cliente_id === clienteId)
+        p.id === projetoId
           ? { ...p, status_servico: coluna.id as any }
           : p
       )
     )
     
-    // Atualizar status do projeto para o ID da coluna
-    // O ID da coluna se torna o status único do projeto
-    // IMPORTANTE: Atualizar TODOS os lançamentos deste serviço/cliente
-    // Isso vai disparar a subscription realtime que atualizará a tabela automaticamente
+    // Atualizar status apenas deste lançamento específico (cada projeto é independente)
     const supabase = createClient()
     const { error } = await supabase
       .from('financeiro_lancamentos')
       .update({ status_servico: coluna.id })
-      .eq('servico_id', servicoId)
-      .eq('cliente_id', clienteId)
+      .eq('id', projetoId)
 
     if (error) {
       // Se houver erro, reverter a mudança local preservando dados financeiros
       setProjetos(prevProjetos => 
         prevProjetos.map(p => 
-          (p.servico_id === servicoId && p.cliente_id === clienteId)
+          p.id === projetoId
             ? { ...p, status_servico: projeto.status_servico }
             : p
         )
@@ -415,8 +417,7 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('projetoStatusChanged', {
           detail: {
-            servicoId: servicoId,
-            clienteId: clienteId,
+            lancamentoId: projetoId,
             newStatus: coluna.id
           }
         }))
@@ -530,7 +531,7 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
             msOverflowStyle: 'none',
           }}
         >
-          {colunas.length === 0 ? (
+          {colunas.length === 0 && projetosSemStatus.length === 0 ? (
             <div className="w-full flex items-center justify-center py-12 px-4">
               <div className="text-center max-w-md">
                 <Settings className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -550,7 +551,11 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
               </div>
             </div>
           ) : (
-            colunas.map((coluna, colunaIndex) => {
+            // Renderizar coluna "Não atribuído" primeiro se existir, depois as outras colunas
+            [
+              ...(colunaNaoAtribuido ? [colunaNaoAtribuido] : []),
+              ...colunas
+            ].map((coluna, colunaIndex) => {
             const projetosNaColuna = projetosPorColuna[coluna.id] || []
             const isDragOver = dragOverColunaId === coluna.id
 
@@ -581,16 +586,18 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
                   >
                     {coluna.nome}
                   </h3>
-                  <button
-                    className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors"
-                    title="Opções"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      // TODO: Implementar menu de opções
-                    }}
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
+                  {coluna.id !== '__nao_atribuido__' && (
+                    <button
+                      className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors"
+                      title="Opções"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        // TODO: Implementar menu de opções
+                      }}
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
                 {/* Valor total + Quantidade de projetos */}
                 <div className="flex items-center justify-between" style={{ marginTop: '-10px' }}>
@@ -630,7 +637,7 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
                   </div>
                 ) : (
                   projetosNaColuna.map((projeto) => {
-                    const projetoKey = `${projeto.servico_id}|||${projeto.cliente_id}`
+                    const projetoKey = projeto.id
                     const isDragged = draggedProjetoId === projetoKey
                     const nomeProjeto = projeto.servicos?.nome || 'Serviço não encontrado'
 
