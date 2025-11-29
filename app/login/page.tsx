@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -8,6 +8,14 @@ import { Input } from '@/components/ui/Input'
 import { Play } from 'lucide-react'
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Carregando...</div>}>
+      <LoginPageContent />
+    </Suspense>
+  )
+}
+
+function LoginPageContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,12 +25,12 @@ export default function LoginPage() {
   const searchParams = useSearchParams()
   const supabase = createClient()
 
-  // Verificar se há mensagem de sucesso na URL
   useEffect(() => {
     const passwordReset = searchParams.get('passwordReset')
-    if (passwordReset === 'success') {
-      setSuccessMessage('Senha redefinida com sucesso! Faça login com sua nova senha.')
+    if (passwordReset === 'true') {
+      setSuccessMessage('Senha redefinida com sucesso! Você já pode fazer login.')
     }
+  }, [searchParams])
     
     // Verificar se o usuário já está autenticado (após reload)
     const checkAuth = async () => {
