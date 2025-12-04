@@ -7,8 +7,6 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/Input'
 
 export const dynamic = 'force-dynamic'
-export const fetchCache = 'force-no-store'
-export const revalidate = 0
 
 function ResetPasswordPageContent() {
   const [password, setPassword] = useState('')

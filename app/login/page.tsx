@@ -8,8 +8,6 @@ import { Input } from '@/components/ui/Input'
 import { Play } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
-export const fetchCache = 'force-no-store'
-export const revalidate = 0
 
 function LoginPageContent() {
   const [email, setEmail] = useState('')
