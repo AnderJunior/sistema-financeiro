@@ -109,3 +109,4 @@ SELECT COUNT(*) as grupos_sem_user_id FROM grupos WHERE user_id IS NULL;
 
 
 
+

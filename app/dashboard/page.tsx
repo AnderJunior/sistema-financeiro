@@ -13,6 +13,7 @@ import { ClientesPorMesChart } from '@/components/dashboard/ClientesPorMesChart'
 import { ValorPorTipoServicoChart } from '@/components/dashboard/ValorPorTipoServicoChart'
 import { ServicosProximosVencimento } from '@/components/dashboard/ServicosProximosVencimento'
 import { ClientesPorMesPorGrupoChart } from '@/components/dashboard/ClientesPorMesPorGrupoChart'
+import { ConfiguracoesIniciais } from '@/components/dashboard/ConfiguracoesIniciais'
 import { DateRangePicker } from '@/components/ui/DateRangePicker'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -170,6 +171,9 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      {/* Container de Mini Tarefas para Configurações Iniciais */}
+      <ConfiguracoesIniciais />
 
       {/* Cards de Estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
