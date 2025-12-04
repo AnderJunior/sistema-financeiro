@@ -26,11 +26,6 @@ services:
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       
-      ## Configurações de Licenciamento (obrigatórias)
-      - LICENSE_EMAIL=${LICENSE_EMAIL}
-      - LICENSE_DOMAIN=${LICENSE_DOMAIN}
-      - LICENSE_API_URL=${LICENSE_API_URL}
-      
     deploy:
       mode: replicated
       replicas: 1
