@@ -167,33 +167,6 @@ curl -X POST "https://cliente.com.br/api/license/verify" \
   -d '{"email":"cliente@exemplo.com","dominio":"cliente.com.br"}'
 ```
 
-## 🔄 Integração com Asaas + n8n
-
-### Workflow Sugerido
-
-1. **Webhook do Asaas** → n8n recebe confirmação de pagamento
-2. **n8n cria registro** na tabela `assinantes` com status `pendente_ativacao`
-3. **n8n envia email** com link para formulário
-4. **Cliente preenche** email e domínio
-5. **n8n atualiza registro** com email/domínio e status `ativo`
-6. **n8n envia email** com instruções de instalação
-
-### Exemplo de Código n8n
-
-```javascript
-// Node: Supabase - Insert
-const novoAssinante = {
-  email: $json.email, // Do formulário
-  dominio: $json.dominio, // Do formulário
-  status: 'ativo',
-  asaas_customer_id: $json.customerId, // Do webhook Asaas
-  asaas_subscription_id: $json.subscriptionId, // Do webhook Asaas
-  data_vencimento: $json.nextDueDate // Do webhook Asaas
-};
-
-return { json: novoAssinante };
-```
-
 ## 📊 Monitoramento
 
 ### Ver Logs de Verificação
@@ -246,8 +219,7 @@ WHERE proxima_verificacao < NOW()
 ## 📝 Próximos Passos
 
 1. ✅ Sistema básico funcionando
-2. 🔄 Integrar com Asaas + n8n
-3. 🔄 Criar dashboard de gerenciamento de assinantes
+2. 🔄 Criar dashboard de gerenciamento de assinantes
 4. 🔄 Implementar notificações de vencimento
 5. 🔄 Adicionar rate limiting na API
 

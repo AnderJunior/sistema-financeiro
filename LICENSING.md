@@ -59,16 +59,12 @@ INSERT INTO assinantes (
   email,
   dominio,
   status,
-  data_vencimento,
-  asaas_customer_id,
-  asaas_subscription_id
+  data_vencimento
 ) VALUES (
   'cliente@exemplo.com',
   'cliente.com.br',
   'ativo',
-  '2025-12-31 23:59:59+00', -- Data de vencimento
-  'cus_xxxxx', -- ID do cliente no Asaas (opcional)
-  'sub_xxxxx' -- ID da assinatura no Asaas (opcional)
+  '2025-12-31 23:59:59+00' -- Data de vencimento
 );
 ```
 
@@ -225,35 +221,6 @@ A tabela `assinantes` mantém registro de:
 1. Logs do container: `docker logs <container-id>`
 2. Se a API de verificação está acessível
 3. Se as credenciais do Supabase estão corretas
-
-## 🔄 Integração com Asaas + n8n
-
-### Fluxo Recomendado
-
-1. **Cliente paga no Asaas**
-2. **n8n recebe webhook do Asaas**
-3. **n8n cria registro na tabela `assinantes`** (status: `pendente_ativacao`)
-4. **n8n envia email com formulário** para coletar email e domínio
-5. **Cliente preenche formulário**
-6. **n8n atualiza registro** com email e domínio (status: `ativo`)
-7. **n8n envia email** com instruções de instalação
-
-### Exemplo de Webhook n8n
-
-```javascript
-// Após receber confirmação de pagamento do Asaas
-const assinante = {
-  email: $json.customer.email, // Do formulário
-  dominio: $json.custom.dominio, // Do formulário
-  status: 'ativo',
-  asaas_customer_id: $json.customer.id,
-  asaas_subscription_id: $json.subscription.id,
-  data_vencimento: $json.subscription.nextDueDate
-};
-
-// Inserir no Supabase
-await $supabase.from('assinantes').insert(assinante);
-```
 
 ## 📝 Notas Importantes
 
