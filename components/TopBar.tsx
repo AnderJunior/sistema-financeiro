@@ -152,10 +152,26 @@ export function TopBar() {
   }
 
   async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      router.push('/login')
+      // Usar setTimeout para evitar conflitos com recompilação do Next.js
+      setTimeout(() => {
+        router.refresh()
+      }, 100)
+    } catch (error: any) {
+      // Ignorar erros EBUSY relacionados ao OneDrive sincronizando arquivos .next
+      if (error?.code === 'EBUSY' || error?.errno === -4082) {
+        console.warn('Aviso: Arquivo temporariamente bloqueado pelo OneDrive. Logout concluído.')
+        // Forçar redirecionamento mesmo com erro
+        window.location.href = '/login'
+        return
+      }
+      // Para outros erros, ainda tentar redirecionar
+      console.error('Erro ao fazer logout:', error)
+      window.location.href = '/login'
+    }
   }
 
   return (

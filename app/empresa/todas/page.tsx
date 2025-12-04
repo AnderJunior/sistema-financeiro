@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/database.types'
 import { LancamentoModal } from '@/components/modals/LancamentoModal'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 type Cliente = Database['public']['Tables']['clientes']['Row']
 
@@ -24,6 +25,9 @@ type Transferencia = Database['public']['Tables']['transferencias_bancarias']['R
 }
 
 export default function TodasPage() {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
+  
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [transferencias, setTransferencias] = useState<Transferencia[]>([])
   const [totalEntradas, setTotalEntradas] = useState(0)

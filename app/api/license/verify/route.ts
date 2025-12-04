@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verificar se o status está ativo
-    if (assinante.status !== 'ativo') {
+    // Verificar se o status está ativo ou teste
+    if (assinante.status !== 'ativo' && assinante.status !== 'teste') {
       console.log(`Licença inativa: ${email} - ${dominio} - Status: ${assinante.status}`)
       return NextResponse.json(
         { 

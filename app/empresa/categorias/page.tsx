@@ -8,10 +8,14 @@ import { Loading } from '@/components/ui/Loading'
 import { Plus, Edit, Trash2, MoreVertical, ChevronDown, ChevronUp } from 'lucide-react'
 import { CategoriaModal } from '@/components/modals/CategoriaModal'
 import { useModal } from '@/contexts/ModalContext'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 type Categoria = Database['public']['Tables']['financeiro_categorias']['Row']
 
 export default function CategoriasPage() {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
+  
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'entrada' | 'saida'>('entrada')

@@ -2,8 +2,11 @@
 
 import { Card } from '@/components/ui/Card'
 import { Lock } from 'lucide-react'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 export default function AutomacoesPage() {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
   return (
     <div className="p-8">
       <Card>

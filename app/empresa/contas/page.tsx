@@ -9,6 +9,7 @@ import { ContasCarousel } from '@/components/ContasCarousel'
 import { TransferenciasList } from '@/components/TransferenciasList'
 import { ContaModal } from '@/components/modals/ContaModal'
 import { Wallet, Plus } from 'lucide-react'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 type ContaFinanceira = Database['public']['Tables']['contas_financeiras']['Row']
 type Transferencia = Database['public']['Tables']['transferencias_bancarias']['Row'] & {
@@ -17,6 +18,9 @@ type Transferencia = Database['public']['Tables']['transferencias_bancarias']['R
 }
 
 export default function ContasPage() {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
+  
   const [contas, setContas] = useState<ContaFinanceira[]>([])
   const [transferencias, setTransferencias] = useState<Transferencia[]>([])
   const [loading, setLoading] = useState(true)
@@ -174,6 +178,7 @@ export default function ContasPage() {
     </div>
   )
 }
+
 
 
 

@@ -10,6 +10,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { TarefaKanbanColuna } from '@/types/kanban.types'
 import { Database } from '@/types/database.types'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 // Tipagem local para Tarefa (evita problemas com tipos do Database)
 type Tarefa = {
@@ -33,6 +34,8 @@ type ViewMode = 'lista' | 'kanban'
 const STORAGE_VIEW_KEY = 'tarefas_view_mode'
 
 export default function TarefasPage() {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)

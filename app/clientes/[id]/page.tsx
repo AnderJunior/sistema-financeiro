@@ -15,10 +15,14 @@ import { ScrollToHash } from '@/components/ScrollToHash'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Database } from '@/types/database.types'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 type Cliente = Database['public']['Tables']['clientes']['Row']
 
 export default function ClienteDetailPage({ params }: { params: { id: string } }) {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
+  
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão Completa para Freelancers e Pequenas Empresas</title>
+    <meta name="description" content="Gerencie clientes, finanças, projetos e tarefas em um único lugar. A solução completa para freelancers e pequenas empresas.">
+    <link rel="stylesheet" href="landing.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <div class="logo">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="32" height="32" rx="8" fill="url(#gradient)"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#6366F1"/>
+                                <stop offset="1" stop-color="#8B5CF6"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <span>GestãoPro</span>
+                </div>
+                <div class="nav-links">
+                    <a href="#recursos">Recursos</a>
+                    <a href="#precos">Preços</a>
+                    <a href="#contato" class="btn-secondary">Contato</a>
+                    <a href="/login" class="btn-primary">Entrar</a>
+                </div>
+                <button class="mobile-menu-toggle" aria-label="Menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-background"></div>
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-text">
+                    <h1 class="hero-title">
+                        <span class="gradient-text">Maximize sua produtividade</span>
+                        <br>Gerencie tudo em um só lugar
+                    </h1>
+                    <p class="hero-subtitle">
+                        A plataforma completa que reúne gestão de clientes, finanças, projetos e tarefas. 
+                        Feita especialmente para <strong>freelancers e pequenas empresas</strong> que querem crescer de forma organizada.
+                    </p>
+                    <div class="hero-cta">
+                        <a href="#precos" class="btn-hero-primary">Começar agora</a>
+                        <a href="#recursos" class="btn-hero-secondary">Ver recursos</a>
+                    </div>
+                    <div class="hero-stats">
+                        <div class="stat-item">
+                            <div class="stat-number">+500</div>
+                            <div class="stat-label">Usuários ativos</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">98%</div>
+                            <div class="stat-label">Satisfação</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">24/7</div>
+                            <div class="stat-label">Suporte</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <div class="dashboard-preview">
+                        <div class="preview-header">
+                            <div class="preview-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                        <div class="preview-content">
+                            <div class="preview-sidebar"></div>
+                            <div class="preview-main">
+                                <div class="preview-card floating-1"></div>
+                                <div class="preview-card floating-2"></div>
+                                <div class="preview-card floating-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="recursos" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Tudo que você precisa em uma plataforma</h2>
+                <p class="section-subtitle">Mais de 50 funcionalidades para maximizar sua produtividade e organização</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card" data-aos="fade-up">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#EEF2FF"/>
+                            <path d="M24 16L28 22H32L26 28L28 36L24 32L20 36L22 28L16 22H20L24 16Z" fill="#6366F1"/>
+                        </svg>
+                    </div>
+                    <h3>Gestão de Clientes</h3>
+                    <p>Organize todos os seus clientes, histórico de interações, contratos e documentos em um só lugar.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#F0FDF4"/>
+                            <path d="M16 20H32M16 28H32M24 12V36M12 16H36C37.1 16 38 16.9 38 18V30C38 31.1 37.1 32 36 32H12C10.9 32 10 31.1 10 30V18C10 16.9 10.9 16 12 16Z" stroke="#22C55E" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <h3>Controle Financeiro</h3>
+                    <p>Controle receitas, despesas, cobranças e tenha uma visão completa da saúde financeira do seu negócio.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#FEF3C7"/>
+                            <path d="M16 20L24 12L32 20M24 12V36M20 28H28" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <h3>Gestão de Projetos</h3>
+                    <p>Planeje, acompanhe e entregue projetos no prazo com visualizações Kanban, timeline e muito mais.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="300">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#FCE7F3"/>
+                            <path d="M24 16C20.7 16 18 18.7 18 22C18 25.3 20.7 28 24 28C27.3 28 30 25.3 30 22C30 18.7 27.3 16 24 16ZM24 30C19.6 30 16 26.4 16 22C16 17.6 19.6 14 24 14C28.4 14 32 17.6 32 22C32 26.4 28.4 30 24 30Z" fill="#EC4899"/>
+                        </svg>
+                    </div>
+                    <h3>Tarefas e Prazos</h3>
+                    <p>Crie tarefas, defina prioridades, acompanhe prazos e nunca mais perca um compromisso importante.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="400">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#E0E7FF"/>
+                            <path d="M24 16C28.4 16 32 19.6 32 24C32 28.4 28.4 32 24 32C19.6 32 16 28.4 16 24C16 19.6 19.6 16 24 16ZM24 14C18.5 14 14 18.5 14 24C14 29.5 18.5 34 24 34C29.5 34 34 29.5 34 24C34 18.5 29.5 14 24 14Z" fill="#6366F1"/>
+                        </svg>
+                    </div>
+                    <h3>Automações Inteligentes</h3>
+                    <p>Automatize processos repetitivos e economize horas do seu dia com workflows personalizados.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="500">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#F0F9FF"/>
+                            <path d="M24 20V28M20 24H28M16 16H32C33.1 16 34 16.9 34 18V30C34 31.1 33.1 32 32 32H16C14.9 32 14 31.1 14 30V18C14 16.9 14.9 16 16 16Z" stroke="#0EA5E9" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <h3>Relatórios e Dashboards</h3>
+                    <p>Visualize métricas importantes, acompanhe o crescimento e tome decisões baseadas em dados reais.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Screenshots Section -->
+    <section class="screenshots">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Veja como funciona</h2>
+                <p class="section-subtitle">Interface intuitiva e poderosa, projetada para você trabalhar com eficiência</p>
+            </div>
+            <div class="screenshots-grid">
+                <div class="screenshot-item" data-aos="zoom-in">
+                    <div class="screenshot-frame">
+                        <div class="screenshot-header">
+                            <div class="screenshot-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                        <div class="screenshot-content dashboard-screenshot">
+                            <div class="screenshot-sidebar"></div>
+                            <div class="screenshot-main">
+                                <div class="screenshot-chart"></div>
+                                <div class="screenshot-cards">
+                                    <div class="screenshot-card"></div>
+                                    <div class="screenshot-card"></div>
+                                    <div class="screenshot-card"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="screenshot-label">Dashboard Principal</div>
+                    </div>
+                </div>
+                <div class="screenshot-item" data-aos="zoom-in" data-aos-delay="200">
+                    <div class="screenshot-frame">
+                        <div class="screenshot-header">
+                            <div class="screenshot-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                        <div class="screenshot-content clients-screenshot">
+                            <div class="screenshot-table">
+                                <div class="table-row"></div>
+                                <div class="table-row"></div>
+                                <div class="table-row"></div>
+                                <div class="table-row"></div>
+                            </div>
+                        </div>
+                        <div class="screenshot-label">Gestão de Clientes</div>
+                    </div>
+                </div>
+                <div class="screenshot-item" data-aos="zoom-in" data-aos-delay="400">
+                    <div class="screenshot-frame">
+                        <div class="screenshot-header">
+                            <div class="screenshot-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                        <div class="screenshot-content projects-screenshot">
+                            <div class="kanban-board">
+                                <div class="kanban-column">
+                                    <div class="kanban-card"></div>
+                                    <div class="kanban-card"></div>
+                                </div>
+                                <div class="kanban-column">
+                                    <div class="kanban-card"></div>
+                                </div>
+                                <div class="kanban-column">
+                                    <div class="kanban-card"></div>
+                                    <div class="kanban-card"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="screenshot-label">Projetos Kanban</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="precos" class="pricing">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Planos que cabem no seu bolso</h2>
+                <p class="section-subtitle">Escolha o plano ideal para o seu negócio. Sem surpresas, sem taxas escondidas.</p>
+            </div>
+            <div class="pricing-grid">
+                <div class="pricing-card" data-aos="fade-up">
+                    <div class="pricing-header">
+                        <h3 class="pricing-name">Básico</h3>
+                        <div class="pricing-price">
+                            <span class="currency">R$</span>
+                            <span class="amount">49</span>
+                            <span class="period">/mês</span>
+                        </div>
+                        <p class="pricing-description">Perfeito para começar</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.667 5L7.5 14.167L3.333 10" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Até 50 clientes
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.667 5L7.5 14.167L3.333 10" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Gestão financeira completa
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.667 5L7.5 14.167L3.333 10" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Projetos e tarefas ilimitados
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.667 5L7.5 14.167L3.333 10" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Relatórios básicos
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.667 5L7.5 14.167L3.333 10" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Suporte por email
+                        </li>
+                    </ul>
+                    <button class="pricing-btn" disabled>Em breve</button>
+                </div>
+                <div class="pricing-card featured" data-aos="fade-up" data-aos-delay="200">
+                    <div class="pricing-badge">Mais Popular</div>
+                    <div class="pricing-header">
+                        <h3 class="pricing-name">Pro</h3>
+                        <div class="pricing-price">
+                            <span class="currency">R$</span>
+                            <span class="amount">99</span>
+                            <span class="period">/mês</span>
+                        </div>
+                        <p class="pricing-description">Para quem quer crescer</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.667 5L7.5 14.167L3.333 10" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Clientes ilimitados
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.667 5L7.5 14.167L3.333 10" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Tudo do plano Básico
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.667 5L7.5 14.167L3.333 10" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Automações avançadas
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.667 5L7.5 14.167L3.333 10" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Relatórios avançados
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.667 5L7.5 14.167L3.333 10" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Integrações premium
+                        </li>
+                        <li>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.667 5L7.5 14.167L3.333 10" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Suporte prioritário 24/7
+                        </li>
+                    </ul>
+                    <button class="pricing-btn" disabled>Em breve</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Form Section -->
+    <section id="contato" class="contact-form-section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Fale conosco</h2>
+                <p class="section-subtitle">Preencha o formulário abaixo e nossa equipe entrará em contato em breve</p>
+            </div>
+            <div class="form-container">
+                <form id="contactForm" class="contact-form">
+                    <div class="form-group">
+                        <label for="nome">Nome completo *</label>
+                        <input 
+                            type="text" 
+                            id="nome" 
+                            name="nome" 
+                            required 
+                            placeholder="Seu nome completo"
+                            autocomplete="name"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="email">E-mail *</label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            required 
+                            placeholder="seu@email.com"
+                            autocomplete="email"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="documento">CPF/CNPJ *</label>
+                        <input 
+                            type="text" 
+                            id="documento" 
+                            name="documento" 
+                            required 
+                            placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                            maxlength="18"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="telefone">Telefone *</label>
+                        <input 
+                            type="tel" 
+                            id="telefone" 
+                            name="telefone" 
+                            required 
+                            placeholder="(00) 00000-0000"
+                            maxlength="15"
+                        >
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-form-submit" id="submitBtn">
+                            <span class="btn-text">Enviar</span>
+                            <span class="btn-loader" style="display: none;">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="31.416" stroke-dashoffset="31.416">
+                                        <animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416;0 31.416" repeatCount="indefinite"/>
+                                        <animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416;-31.416" repeatCount="indefinite"/>
+                                    </circle>
+                                </svg>
+                            </span>
+                        </button>
+                    </div>
+                    <div id="formMessage" class="form-message" style="display: none;"></div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="container">
+            <div class="cta-content">
+                <h2 class="cta-title">Pronto para transformar sua gestão?</h2>
+                <p class="cta-subtitle">Junte-se a centenas de freelancers e pequenas empresas que já estão organizando seus negócios</p>
+                <a href="#precos" class="btn-cta">Ver planos</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="logo">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="32" height="32" rx="8" fill="url(#gradient2)"/>
+                            <defs>
+                                <linearGradient id="gradient2" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                                    <stop stop-color="#6366F1"/>
+                                    <stop offset="1" stop-color="#8B5CF6"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <span>GestãoPro</span>
+                    </div>
+                    <p>Gestão completa para freelancers e pequenas empresas</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>Produto</h4>
+                        <a href="#recursos">Recursos</a>
+                        <a href="#precos">Preços</a>
+                        <a href="#contato">Contato</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Empresa</h4>
+                        <a href="#sobre">Sobre</a>
+                        <a href="#blog">Blog</a>
+                        <a href="#carreiras">Carreiras</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Suporte</h4>
+                        <a href="#ajuda">Central de Ajuda</a>
+                        <a href="#documentacao">Documentação</a>
+                        <a href="#status">Status</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 GestãoPro. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="landing.js"></script>
+</body>
+</html>
+

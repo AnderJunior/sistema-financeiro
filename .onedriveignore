@@ -1,0 +1,10 @@
+# Excluir pastas de build e cache do OneDrive
+.next/
+node_modules/
+out/
+build/
+.vercel/
+*.log
+.env*.local
+.env
+

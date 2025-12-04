@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/database.types'
 import { ClienteModal } from '@/components/modals/ClienteModal'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 type Cliente = Database['public']['Tables']['clientes']['Row']
 type Grupo = Database['public']['Tables']['grupos']['Row']
@@ -25,6 +26,9 @@ type ViewMode = 'lista' | 'kanban'
 const STORAGE_VIEW_KEY = 'clientes_view_mode'
 
 export default function ClientesPage() {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
+  
   const [clientes, setClientes] = useState<ClienteComGrupos[]>([])
   const [grupos, setGrupos] = useState<Grupo[]>([])
   const [loading, setLoading] = useState(true)

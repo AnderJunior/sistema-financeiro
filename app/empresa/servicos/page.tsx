@@ -9,10 +9,14 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/database.types'
 import { ServicoModal } from '@/components/modals/ServicoModal'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 type Servico = Database['public']['Tables']['servicos']['Row']
 
 export default function ServicosPage() {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
+  
   const [servicos, setServicos] = useState<Servico[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -137,6 +141,7 @@ export default function ServicosPage() {
     </div>
   )
 }
+
 
 
 

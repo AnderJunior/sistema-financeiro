@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/database.types'
 import { GrupoModal } from '@/components/modals/GrupoModal'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 type Grupo = Database['public']['Tables']['grupos']['Row']
 
@@ -17,6 +18,9 @@ export interface GrupoComEstatisticas extends Grupo {
 }
 
 export default function GruposPage() {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
+  
   const [grupos, setGrupos] = useState<GrupoComEstatisticas[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)

@@ -3,7 +3,6 @@
 import { usePathname } from 'next/navigation'
 import { Sidebar } from '@/components/Sidebar'
 import { TopBar } from '@/components/TopBar'
-import { AutomationTriggerProvider } from '@/components/AutomationTriggerProvider'
 import { PageLoading } from '@/components/PageLoading'
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
@@ -29,7 +28,6 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   return (
     <>
       <PageLoading />
-      <AutomationTriggerProvider />
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden">

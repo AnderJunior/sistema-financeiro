@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 import { Card } from '@/components/ui/Card'
 import { Loading } from '@/components/ui/Loading'
 import { Input } from '@/components/ui/Input'
@@ -34,6 +35,9 @@ interface Configuracao {
 type ConfiguracoesMap = Record<string, string>
 
 export default function ConfiguracoesPage() {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
+  
   const [configuracoes, setConfiguracoes] = useState<Configuracao[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

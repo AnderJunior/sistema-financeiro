@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { ModalProvider } from '@/contexts/ModalContext'
+import { AssinaturaProvider } from '@/contexts/AssinaturaContext'
 import { LayoutWrapper } from '@/components/LayoutWrapper'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -20,9 +21,11 @@ export default function RootLayout({
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
         <ModalProvider>
-          <LayoutWrapper>
-            {children}
-          </LayoutWrapper>
+          <AssinaturaProvider>
+            <LayoutWrapper>
+              {children}
+            </LayoutWrapper>
+          </AssinaturaProvider>
         </ModalProvider>
       </body>
     </html>

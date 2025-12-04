@@ -8,6 +8,7 @@ import { ProjetosKanban } from '@/components/ProjetosKanban'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/database.types'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 type Lancamento = Database['public']['Tables']['financeiro_lancamentos']['Row'] & {
   servicos?: Database['public']['Tables']['servicos']['Row']
@@ -19,6 +20,9 @@ type ViewMode = 'lista' | 'kanban'
 const STORAGE_VIEW_KEY = 'projetos_view_mode'
 
 export default function ProjetosPage() {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
+  
   const [projetos, setProjetos] = useState<Lancamento[]>([])
   const [loading, setLoading] = useState(true)
   const [isFilterOpen, setIsFilterOpen] = useState(false)

@@ -8,6 +8,7 @@ import { CalendarSidebar } from '@/components/calendar/CalendarSidebar'
 import { formatDate, parseDateForCalendar } from '@/lib/utils'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { startOfWeek, endOfWeek } from 'date-fns'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 // Tipagem local para Tarefa (evita problemas com tipos do Database)
 type Tarefa = {
@@ -48,6 +49,9 @@ export type CalendarEvent = {
 type ViewMode = 'daily' | 'weekly' | 'monthly'
 
 export default function CalendarioPage() {
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura } = useAssinaturaAtiva()
+  
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<ViewMode>('weekly')
   const [events, setEvents] = useState<CalendarEvent[]>([])

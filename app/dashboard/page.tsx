@@ -20,17 +20,20 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import { verificarServicosAtrasados } from '@/lib/utils/notificacoes-servicos'
+import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 export default function DashboardPage() {
   const router = useRouter()
   const supabase = createClient()
+  
+  // Verificar assinatura ativa (bloqueia acesso se não tiver)
+  const { loading: loadingAssinatura, hasAssinaturaAtiva, assinaturaInfo } = useAssinaturaAtiva()
   
   // Verificar autenticação no cliente como fallback
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        console.log('❌ Sem sessão no dashboard, redirecionando para login')
         router.push('/login?redirectTo=/dashboard')
       }
     }

@@ -75,11 +75,12 @@ export async function middleware(request: NextRequest) {
   //   supabaseCookies: supabaseCookies.map(c => c.name),
   // })
 
-  // Rotas públicas que não precisam de autenticação
+  // Rotas públicas que não precisam de autenticação nem assinatura ativa
   const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/licenca-invalida']
   const isPublicRoute = publicRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   )
+
 
   // Se o usuário não está autenticado e tenta acessar rota protegida
   if (!user && !isPublicRoute) {
@@ -100,19 +101,8 @@ export async function middleware(request: NextRequest) {
 
   // Se o usuário está autenticado e tenta acessar página de login/registro
   if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
-    // console.log('[Middleware] ✅ Usuário autenticado, redirecionando para dashboard')
-    const redirectResponse = NextResponse.redirect(new URL('/dashboard', request.url))
-    // Copiar cookies atualizados para a resposta de redirecionamento
-    response.cookies.getAll().forEach(cookie => {
-      redirectResponse.cookies.set(cookie.name, cookie.value)
-    })
-    return redirectResponse
-  }
-
-  // Verificar licença se o usuário está autenticado e não está em rota pública/API
-  if (user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/api/')) {
+    // Verificar se tem assinatura ativa antes de redirecionar
     try {
-      // Usar Service Role Key para verificar licença (acesso à tabela assinantes)
       const supabaseAdmin = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -124,40 +114,77 @@ export async function middleware(request: NextRequest) {
         }
       )
 
-      // Verificar se o email do usuário tem licença ativa
-      const { data: assinante, error } = await supabaseAdmin
+      const { data: assinante, error: errorAssinante } = await supabaseAdmin
         .from('assinantes')
-        .select('status, data_vencimento')
-        .eq('email', user.email?.toLowerCase().trim())
-        .eq('status', 'ativo')
-        .single()
+        .select('status, id, plano_nome')
+        .eq('user_id', user.id)
+        .in('status', ['ativo', 'teste'])
+        .maybeSingle()
 
-      // Se não encontrou assinante ou está inativo
-      if (error || !assinante) {
-        // Permitir acesso à página de licença inválida
-        if (request.nextUrl.pathname === '/licenca-invalida') {
-          return response
+      // Se não tem assinatura ativa, redirecionar para google.com
+      if (!assinante) {
+        return NextResponse.redirect('https://google.com')
+      }
+
+      // Tem assinatura ativa - redirecionar para dashboard
+      const redirectResponse = NextResponse.redirect(new URL('/dashboard', request.url))
+      response.cookies.getAll().forEach(cookie => {
+        redirectResponse.cookies.set(cookie.name, cookie.value)
+      })
+      return redirectResponse
+    } catch (error: any) {
+      // Em caso de erro, redirecionar para google.com
+      return NextResponse.redirect('https://google.com')
+    }
+  }
+
+  // VERIFICAÇÃO ÚNICA: Verificar assinatura ativa se o usuário está autenticado e não está em rota pública/API
+  if (user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/api/')) {
+    try {
+      // Usar Service Role Key para verificar assinatura (acesso à tabela assinantes)
+      const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      )
+
+      // Verificar se o usuário tem assinatura com status "ativo" ou "teste"
+      const { data: assinanteAtiva, error: errorAtiva } = await supabaseAdmin
+        .from('assinantes')
+        .select('status, id, plano_nome, data_vencimento')
+        .eq('user_id', user.id)
+        .in('status', ['ativo', 'teste'])
+        .maybeSingle()
+
+      // Se houve erro na query
+      if (errorAtiva) {
+        // Erro PGRST116 = nenhum registro encontrado (não tem assinatura ativa)
+        if (errorAtiva.code === 'PGRST116') {
+          // Não tem assinatura ativa - redirecionar para google.com
+          return NextResponse.redirect('https://google.com')
         }
         
-        // Redirecionar para página de licença inválida
-        return NextResponse.redirect(new URL('/licenca-invalida', request.url))
+        // Em caso de erro técnico, redirecionar para google.com (mais seguro)
+        return NextResponse.redirect('https://google.com')
       }
 
-      // Verificar se a licença não está vencida
-      if (assinante.data_vencimento && new Date(assinante.data_vencimento) < new Date()) {
-        if (request.nextUrl.pathname === '/licenca-invalida') {
-          return response
-        }
-        return NextResponse.redirect(new URL('/licenca-invalida', request.url))
+      // Se não encontrou assinante ativo, redirecionar para google.com
+      if (!assinanteAtiva) {
+        return NextResponse.redirect('https://google.com')
       }
-    } catch (error) {
-      // Em caso de erro, permitir acesso (não bloquear por falha técnica)
-      console.error('[Middleware] Erro ao verificar licença:', error)
+
+      // Se chegou aqui, tem assinatura ativa - permitir acesso
+    } catch (error: any) {
+      // Em caso de erro inesperado, redirecionar para google.com
+      return NextResponse.redirect('https://google.com')
     }
   }
   
-  // console.log('[Middleware] ✅ Permitindo acesso a:', request.nextUrl.pathname)
-
   // Retornar o response que foi atualizado pelo Supabase com os cookies corretos
   return response
 }

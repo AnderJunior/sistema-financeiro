@@ -51,3 +51,5 @@ COMMENT ON COLUMN notificacoes_log.lida IS 'Indica se a notificação foi lida p
 
 
 
+
+
