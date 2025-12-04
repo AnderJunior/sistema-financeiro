@@ -1,12 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/Input'
 
-export default function ResetPasswordPage() {
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const revalidate = 0
+
+function ResetPasswordPageContent() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -28,7 +32,7 @@ export default function ResetPasswordPage() {
       }
     }
     checkSession()
-  }, [searchParams])
+  }, [searchParams, supabase])
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -174,3 +178,16 @@ export default function ResetPasswordPage() {
   )
 }
 
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          Carregando...
+        </div>
+      }
+    >
+      <ResetPasswordPageContent />
+    </Suspense>
+  )
+}
