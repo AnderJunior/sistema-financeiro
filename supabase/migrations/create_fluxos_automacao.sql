@@ -41,3 +41,9 @@ CREATE TRIGGER update_fluxos_automacao_updated_at BEFORE UPDATE ON fluxos_automa
 
 
 
+
+
+
+
+
+

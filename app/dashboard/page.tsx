@@ -111,10 +111,10 @@ export default function DashboardPage() {
     // Verificar serviços atrasados ao carregar o dashboard
     verificarServicosAtrasados()
 
-    // Configurar subscriptions Realtime
+    // OTIMIZADO: Consolidar subscriptions em um único canal
     const supabase = createClient()
-    const channel1 = supabase
-      .channel('dashboard_financeiro_changes')
+    const channel = supabase
+      .channel('dashboard_changes')
       .on(
         'postgres_changes',
         {
@@ -126,10 +126,6 @@ export default function DashboardPage() {
           await loadData()
         }
       )
-      .subscribe()
-
-    const channel2 = supabase
-      .channel('dashboard_clientes_changes')
       .on(
         'postgres_changes',
         {
@@ -144,8 +140,7 @@ export default function DashboardPage() {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel1)
-      supabase.removeChannel(channel2)
+      supabase.removeChannel(channel)
     }
   }, [dateRange])
 

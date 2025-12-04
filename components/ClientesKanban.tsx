@@ -67,65 +67,98 @@ export function ClientesKanban({ clientes: initialClientes, viewMode, onViewMode
   const [dragOverStatus, setDragOverStatus] = useState<StatusType | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  // Buscar dados financeiros dos clientes
+  // Buscar dados financeiros dos clientes - OTIMIZADO: uma query agregada em vez de N queries
   useEffect(() => {
     async function loadDadosFinanceiros() {
+      if (initialClientes.length === 0) {
+        setClientes(initialClientes)
+        return
+      }
+
       const supabase = createClient()
       const hoje = new Date()
       hoje.setHours(0, 0, 0, 0)
+      const hojeStr = hoje.toISOString().split('T')[0]
 
-      const clientesComDados = await Promise.all(
-        initialClientes.map(async (cliente) => {
-          // Buscar valor vendido (soma de lançamentos pagos)
-          const { data: lancamentosPagos } = await supabase
-            .from('financeiro_lancamentos')
-            .select('valor')
-            .eq('cliente_id', cliente.id)
-            .eq('tipo', 'entrada')
-            .eq('status', 'pago')
+      // Buscar TODOS os lançamentos de uma vez para todos os clientes
+      const clienteIds = initialClientes.map(c => c.id)
 
-          const valorVendido = lancamentosPagos?.reduce((sum, l) => sum + Number(l.valor || 0), 0) || 0
+      // Query única para buscar todos os lançamentos relevantes
+      const { data: todosLancamentos } = await supabase
+        .from('financeiro_lancamentos')
+        .select('cliente_id, valor, status, data_vencimento, tipo')
+        .in('cliente_id', clienteIds)
+        .eq('tipo', 'entrada')
 
-          // Buscar valor das cobranças ativas (não pagas)
-          const { data: cobrancasAtivas } = await supabase
-            .from('financeiro_lancamentos')
-            .select('valor')
-            .eq('cliente_id', cliente.id)
-            .eq('tipo', 'entrada')
-            .neq('status', 'pago')
+      if (!todosLancamentos) {
+        setClientes(initialClientes)
+        return
+      }
 
-          const valorCobrancasAtivas = cobrancasAtivas?.reduce((sum, l) => sum + Number(l.valor || 0), 0) || 0
+      // Processar dados no cliente (agregação em memória)
+      const dadosPorCliente = new Map<string, {
+        valorVendido: number
+        valorCobrancasAtivas: number
+        proximaDataVencimento: string | null
+      }>()
 
-          // Buscar próxima data de vencimento (menor data_vencimento futura não paga)
-          const { data: proximasCobrancas } = await supabase
-            .from('financeiro_lancamentos')
-            .select('data_vencimento')
-            .eq('cliente_id', cliente.id)
-            .eq('tipo', 'entrada')
-            .neq('status', 'pago')
-            .gte('data_vencimento', hoje.toISOString().split('T')[0])
-            .order('data_vencimento', { ascending: true })
-            .limit(1)
-
-          return {
-            ...cliente,
-            valorVendido,
-            valorCobrancasAtivas,
-            proximaDataVencimento: proximasCobrancas && proximasCobrancas.length > 0 
-              ? proximasCobrancas[0].data_vencimento 
-              : null
-          }
+      // Inicializar todos os clientes
+      initialClientes.forEach(cliente => {
+        dadosPorCliente.set(cliente.id, {
+          valorVendido: 0,
+          valorCobrancasAtivas: 0,
+          proximaDataVencimento: null
         })
-      )
+      })
+
+      // Processar lançamentos
+      todosLancamentos.forEach(lancamento => {
+        if (!lancamento.cliente_id) return
+
+        const dados = dadosPorCliente.get(lancamento.cliente_id)
+        if (!dados) return
+
+        const valor = Number(lancamento.valor || 0)
+
+        if (lancamento.status === 'pago') {
+          // Lançamentos pagos = valor vendido
+          dados.valorVendido += valor
+        } else {
+          // Lançamentos não pagos = cobranças ativas
+          dados.valorCobrancasAtivas += valor
+
+          // Verificar próxima data de vencimento
+          if (lancamento.data_vencimento) {
+            const dataVenc = lancamento.data_vencimento
+            if (dataVenc >= hojeStr) {
+              if (!dados.proximaDataVencimento || dataVenc < dados.proximaDataVencimento) {
+                dados.proximaDataVencimento = dataVenc
+              }
+            }
+          }
+        }
+      })
+
+      // Combinar dados com clientes
+      const clientesComDados = initialClientes.map(cliente => {
+        const dados = dadosPorCliente.get(cliente.id) || {
+          valorVendido: 0,
+          valorCobrancasAtivas: 0,
+          proximaDataVencimento: null
+        }
+
+        return {
+          ...cliente,
+          valorVendido: dados.valorVendido,
+          valorCobrancasAtivas: dados.valorCobrancasAtivas,
+          proximaDataVencimento: dados.proximaDataVencimento
+        }
+      })
 
       setClientes(clientesComDados)
     }
 
-    if (initialClientes.length > 0) {
-      loadDadosFinanceiros()
-    } else {
-      setClientes(initialClientes)
-    }
+    loadDadosFinanceiros()
   }, [initialClientes])
 
   // Função para obter inicial do nome

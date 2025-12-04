@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, MessageSquare, Send, Calendar, User, FolderTree, FileText, Link2, ThumbsUp, Smile, ChevronDown, ChevronUp, Flag, Search as SearchIcon } from 'lucide-react'
+import { X, MessageSquare, Send, Calendar, User, FolderTree, FileText, Link2, ThumbsUp, Smile, ChevronDown, ChevronUp, Flag, Search as SearchIcon, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/utils'
 import { useModal } from '@/contexts/ModalContext'
@@ -47,6 +47,7 @@ type Comentario = {
   id: string
   comentario: string
   created_at: string
+  user_id?: string | null
 }
 
 type AtividadeItem = 
@@ -68,13 +69,14 @@ type StatusOption = {
 }
 
 export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanColumns }: TarefaDetailModalProps) {
-  const { alert } = useModal()
+  const { alert, confirm } = useModal()
   const [loading, setLoading] = useState(false)
   const [atividades, setAtividades] = useState<AtividadeItem[]>([])
   const [comentario, setComentario] = useState('')
   const [tarefaData, setTarefaData] = useState<Tarefa>(tarefa)
   const [originalTarefa, setOriginalTarefa] = useState<Tarefa>(tarefa)
   const [draftHasChanges, setDraftHasChanges] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [pendingStatusChange, setPendingStatusChange] = useState<{
     oldStatus: string
     newStatus: string
@@ -103,12 +105,12 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
         .from('tarefas_atividades')
         .select('*')
         .eq('tarefa_id', tarefa.id)
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: true }),
       supabase
         .from('tarefas_comentarios')
         .select('*')
         .eq('tarefa_id', tarefa.id)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: true })
     ])
 
     const atividadesList: AtividadeItem[] = []
@@ -122,7 +124,7 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
     }
 
     atividadesList.sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     )
 
     setAtividades(atividadesList)
@@ -247,6 +249,12 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
       setPendingStatusChange(null)
       loadAtividades()
       loadClientes()
+      
+      // Buscar usuário atual
+      const supabase = createClient()
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        setCurrentUserId(user?.id || null)
+      })
     }
   }, [isOpen, tarefa, loadAtividades, loadClientes])
 
@@ -327,6 +335,7 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
 
   const handleComentarioSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     
     if (!comentario.trim()) return
 
@@ -343,9 +352,35 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
     if (!error) {
       setComentario('')
       await loadAtividades()
-      onUpdate?.()
     } else {
       await alert('Erro ao adicionar comentário: ' + error.message, 'Erro')
+    }
+    setLoading(false)
+  }
+
+  const handleDeleteComentario = async (comentarioId: string) => {
+    const confirmed = await confirm(
+      'Tem certeza que deseja excluir este comentário?',
+      'Confirmar exclusão',
+      'Excluir',
+      'Cancelar',
+      'danger'
+    )
+    
+    if (!confirmed) return
+
+    setLoading(true)
+    const supabase = createClient()
+    
+    const { error } = await supabase
+      .from('tarefas_comentarios')
+      .delete()
+      .eq('id', comentarioId)
+
+    if (!error) {
+      await loadAtividades()
+    } else {
+      await alert('Erro ao excluir comentário: ' + error.message, 'Erro')
     }
     setLoading(false)
   }
@@ -518,6 +553,36 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
     return saved
   }, [alert, draftHasChanges, loadAtividades, onUpdate, originalTarefa, pendingStatusChange, tarefa.id, tarefaData])
 
+  const handleDelete = useCallback(async () => {
+    const confirmed = await confirm(
+      `Tem certeza que deseja excluir a tarefa "${tarefaData.nome}"?\n\nEsta ação não pode ser desfeita.`,
+      'Confirmar exclusão',
+      'Excluir',
+      'Cancelar',
+      'danger'
+    )
+    
+    if (!confirmed) return
+
+    setLoading(true)
+    const supabase = createClient()
+    
+    const { error } = await supabase
+      .from('tarefas')
+      .delete()
+      .eq('id', tarefa.id)
+
+    if (error) {
+      await alert('Erro ao excluir tarefa: ' + error.message, 'Erro')
+      setLoading(false)
+      return
+    }
+
+    setLoading(false)
+    onUpdate?.()
+    onClose()
+  }, [confirm, tarefa.id, tarefaData.nome, alert, onUpdate, onClose])
+
   const handleModalClose = useCallback(() => {
     void (async () => {
       const saved = await saveChanges()
@@ -592,13 +657,24 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
               <span className="text-sm font-mono text-gray-400">{tarefaData.id.substring(0, 8)}</span>
             </div>
           </div>
-          <button
-            onClick={() => void handleModalClose()}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
-            aria-label="Fechar modal"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void handleDelete()}
+              disabled={loading}
+              className="text-red-400 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Excluir tarefa"
+              title="Excluir tarefa"
+            >
+              <Trash2 className="w-6 h-6" />
+            </button>
+            <button
+              onClick={() => void handleModalClose()}
+              className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
+              aria-label="Fechar modal"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -1026,16 +1102,34 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
                 atividades.map((item) => {
                   if (item.tipo === 'comentario') {
                     const comentario = item as Comentario & { tipo: 'comentario' }
+                    const isOwner = currentUserId && comentario.user_id === currentUserId
                     return (
-                      <div key={comentario.id} className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div key={comentario.id} className="bg-white rounded-lg p-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-start gap-3">
                           <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
                             A
                           </div>
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-medium text-gray-900">Anderson Andrade</span>
-                              <span className="text-xs text-gray-500">{formatTimeAgo(comentario.created_at)}</span>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-900">Anderson Andrade</span>
+                                <span className="text-xs text-gray-500">{formatTimeAgo(comentario.created_at)}</span>
+                              </div>
+                              {isOwner && (
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    void handleDeleteComentario(comentario.id)
+                                  }}
+                                  disabled={loading}
+                                  className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  aria-label="Excluir comentário"
+                                  title="Excluir comentário"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                             <div className="text-sm text-gray-700">{comentario.comentario}</div>
                           </div>
@@ -1062,7 +1156,7 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
 
             {/* Comentário Input */}
             <div className="p-4 border-t border-gray-200 bg-white">
-              <form onSubmit={handleComentarioSubmit} className="space-y-2">
+              <form onSubmit={handleComentarioSubmit} onClick={(e) => e.stopPropagation()} className="space-y-2">
                 <textarea
                   value={comentario}
                   onChange={(e) => setComentario(e.target.value)}

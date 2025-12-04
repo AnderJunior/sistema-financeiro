@@ -572,7 +572,7 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
                 }`}
                 style={{
                   borderTopColor: coluna.cor,
-                  width: 'calc((100% - 2rem) / 3)', // 3 colunas com 2 gaps de 1rem (0.25rem * 4 * 2)
+                  width: 'calc((100% - 2rem) / 5)', // 3 colunas com 2 gaps de 1rem (0.25rem * 4 * 2)
                   minWidth: '300px',
                 }}
               >
@@ -663,11 +663,11 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-gray-900 text-base block truncate">
-                              {nomeProjeto}
+                              {projeto.clientes?.nome || nomeProjeto}
                             </p>
                             {projeto.clientes?.nome && (
                               <p className="text-xs text-gray-600 truncate mt-0.5">
-                                {projeto.clientes.nome}
+                                {nomeProjeto}
                               </p>
                             )}
                           </div>
@@ -687,8 +687,8 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
                         <div className="flex items-center gap-4">
                           {/* Valor das cobranças ativas */}
                           <div className="flex items-center gap-2" onMouseDown={(e) => e.stopPropagation()}>
-                            <Wallet className="w-4 h-4 text-gray-600 flex-shrink-0" />
-                            <span className="text-sm font-medium text-gray-900" style={{ color: '#4a4a4a' }}>
+                            <Wallet className="w-3 h-3 text-gray-600 flex-shrink-0" />
+                            <span className="text-sm font-medium text-gray-900" style={{ color: '#4a4a4a', fontSize: '12px' }}>
                               {formatCurrency(projeto.valorCobrancasAtivas || 0)}
                             </span>
                           </div>
@@ -696,8 +696,8 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
                           {/* Data de vencimento */}
                           {projeto.proximaDataVencimento && (
                             <div className="flex items-center gap-2" onMouseDown={(e) => e.stopPropagation()}>
-                              <Calendar className="w-4 h-4 text-gray-600 flex-shrink-0" />
-                              <span className="text-sm text-gray-600" style={{ color: '#4a4a4a' }}>
+                              <Calendar className="w-3 h-3 text-gray-600 flex-shrink-0" />
+                              <span className="text-sm text-gray-600" style={{ color: '#4a4a4a', fontSize: '12px' }}>
                                 {formatDate(projeto.proximaDataVencimento)}
                               </span>
                             </div>
@@ -767,10 +767,27 @@ function GerenciarColunasModal({
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [newColunaData, setNewColunaData] = useState({ nome: '', cor: '#3B82F6' })
   const [editingColunaData, setEditingColunaData] = useState<Record<string, { nome: string; cor: string }>>({})
+  const [colunaFinalizadoId, setColunaFinalizadoId] = useState<string>('')
 
   useEffect(() => {
     // Ordenar colunas por ordem quando o modal abrir
     setColunasOrdenadas([...colunas].sort((a, b) => a.ordem - b.ordem))
+    
+    // Carregar configuração da coluna finalizado
+    if (isOpen) {
+      const supabase = createClient()
+      supabase
+        .from('configuracoes_sistema')
+        .select('valor')
+        .eq('chave', 'projetos_coluna_finalizado_id')
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setColunaFinalizadoId(data.valor || '')
+          }
+        })
+    }
+    
     // Resetar estados quando o modal fechar
     if (!isOpen) {
       setEditingColunaId(null)
@@ -1119,6 +1136,48 @@ function GerenciarColunasModal({
               </button>
             </div>
           )}
+        </div>
+        
+        {/* Configuração da coluna finalizado */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Configuração</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Selecione qual coluna corresponde à etapa "Finalizado". Projetos nesta coluna não aparecerão no calendário.
+          </p>
+          <select
+            value={colunaFinalizadoId}
+            onChange={async (e) => {
+              const novaColunaId = e.target.value
+              setColunaFinalizadoId(novaColunaId)
+              
+              const supabase = createClient()
+              // Salvar ou atualizar configuração
+              const { data: existing } = await supabase
+                .from('configuracoes_sistema')
+                .select('id')
+                .eq('chave', 'projetos_coluna_finalizado_id')
+                .single()
+              
+              if (existing) {
+                await supabase
+                  .from('configuracoes_sistema')
+                  .update({ valor: novaColunaId })
+                  .eq('chave', 'projetos_coluna_finalizado_id')
+              } else {
+                await supabase
+                  .from('configuracoes_sistema')
+                  .insert([{ chave: 'projetos_coluna_finalizado_id', valor: novaColunaId }])
+              }
+            }}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          >
+            <option value="">Selecione uma coluna...</option>
+            {colunasOrdenadas.map((coluna) => (
+              <option key={coluna.id} value={coluna.id}>
+                {coluna.nome}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </Modal>

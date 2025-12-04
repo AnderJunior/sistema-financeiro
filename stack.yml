@@ -21,10 +21,15 @@ services:
       - PORT=3000
       - HOSTNAME=0.0.0.0
       
-      ## Configurações do Supabase
+      ## Configurações do Supabase (mesmo para todos os clientes)
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      
+      ## Configurações de Licenciamento (obrigatórias)
+      - LICENSE_EMAIL=${LICENSE_EMAIL}
+      - LICENSE_DOMAIN=${LICENSE_DOMAIN}
+      - LICENSE_API_URL=${LICENSE_API_URL}
       
     deploy:
       mode: replicated
@@ -39,7 +44,7 @@ services:
         window: 120s
       labels:
       - traefik.enable=1
-      - traefik.http.routers.sistema-financeiro.rule=Host(`sistema-financeiro.seudominio.com.br`) ## Altere para seu domínio
+      - traefik.http.routers.sistema-financeiro.rule=Host(`app.analiscode.com`)
       - traefik.http.routers.sistema-financeiro.entrypoints=websecure
       - traefik.http.routers.sistema-financeiro.priority=1
       - traefik.http.routers.sistema-financeiro.tls.certresolver=letsencryptresolver
@@ -48,7 +53,7 @@ services:
       - traefik.http.services.sistema-financeiro.loadbalancer.server.port=3000
       - traefik.http.services.sistema-financeiro.loadbalancer.passHostHeader=true
       ## Middleware para redirecionar HTTP para HTTPS
-      - traefik.http.routers.sistema-financeiro-http.rule=Host(`sistema-financeiro.seudominio.com.br`)
+      - traefik.http.routers.sistema-financeiro-http.rule=Host(`app.analiscode.com`)
       - traefik.http.routers.sistema-financeiro-http.entrypoints=web
       - traefik.http.routers.sistema-financeiro-http.middlewares=redirect-to-https
       - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https

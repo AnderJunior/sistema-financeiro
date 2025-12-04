@@ -7,19 +7,29 @@ CREATE TABLE IF NOT EXISTS tarefas_kanban_colunas (
   ordem INTEGER NOT NULL DEFAULT 0,
   ativo BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(nome)
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  -- Nota: Não há constraint UNIQUE no nome para permitir colunas com nomes iguais
 );
 
 CREATE INDEX IF NOT EXISTS idx_tarefas_kanban_colunas_ordem ON tarefas_kanban_colunas(ordem);
 CREATE INDEX IF NOT EXISTS idx_tarefas_kanban_colunas_ativo ON tarefas_kanban_colunas(ativo);
 
-INSERT INTO tarefas_kanban_colunas (nome, cor, ordem, ativo) VALUES
-  ('Pendente', '#FBBF24', 0, true),
-  ('Em andamento', '#2563EB', 1, true),
-  ('Concluídas', '#16A34A', 2, true),
-  ('Canceladas', '#DC2626', 3, true)
-ON CONFLICT (nome) DO NOTHING;
+-- Inserir colunas padrão (verificando se já existem antes de inserir)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM tarefas_kanban_colunas WHERE nome = 'Pendente') THEN
+    INSERT INTO tarefas_kanban_colunas (nome, cor, ordem, ativo) VALUES ('Pendente', '#FBBF24', 0, true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM tarefas_kanban_colunas WHERE nome = 'Em andamento') THEN
+    INSERT INTO tarefas_kanban_colunas (nome, cor, ordem, ativo) VALUES ('Em andamento', '#2563EB', 1, true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM tarefas_kanban_colunas WHERE nome = 'Concluídas') THEN
+    INSERT INTO tarefas_kanban_colunas (nome, cor, ordem, ativo) VALUES ('Concluídas', '#16A34A', 2, true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM tarefas_kanban_colunas WHERE nome = 'Canceladas') THEN
+    INSERT INTO tarefas_kanban_colunas (nome, cor, ordem, ativo) VALUES ('Canceladas', '#DC2626', 3, true);
+  END IF;
+END $$;
 
 -- Atualizar os status existentes das tarefas para os IDs das colunas
 UPDATE tarefas
@@ -76,6 +86,8 @@ BEGIN
     EXECUTE format('ALTER TABLE tarefas ALTER COLUMN status SET DEFAULT %L', default_coluna_id);
   END IF;
 END$$;
+
+
 
 
 

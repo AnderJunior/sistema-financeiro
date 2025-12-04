@@ -3,7 +3,7 @@
 import React, { DragEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { formatDate } from '@/lib/utils'
 import { Database } from '@/types/database.types'
-import { Search, List, LayoutGrid, Settings, ChevronLeft, ChevronRight, GripVertical, Edit, Trash2, Plus, X } from 'lucide-react'
+import { Search, List, LayoutGrid, Settings, ChevronLeft, ChevronRight, GripVertical, Edit, Trash2, Plus, X, Flag } from 'lucide-react'
 import { TarefaDetailModal } from '@/components/modals/TarefaDetailModal'
 import { Modal } from '@/components/ui/Modal'
 import { useModal } from '@/contexts/ModalContext'
@@ -371,23 +371,25 @@ export function TarefasKanban({
                           }`}
                           onClick={() => handleCardClick(tarefa)}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-base font-semibold text-gray-900 truncate">{tarefa.nome}</p>
-                              <p className="text-xs text-gray-500 truncate">
-                                {tarefa.clientes?.nome || 'Cliente não informado'}
-                                {tarefa.projetos?.nome ? ` • ${tarefa.projetos.nome}` : ''}
-                              </p>
+                          <div className="min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-base font-semibold text-gray-900 truncate flex-1">{tarefa.nome}</p>
+                              {tarefa.prioridade && (
+                                <Flag 
+                                  className={`w-4 h-4 flex-shrink-0 ${
+                                    tarefa.prioridade === 'urgente' ? 'text-red-600' :
+                                    tarefa.prioridade === 'alta' ? 'text-orange-600' :
+                                    tarefa.prioridade === 'normal' ? 'text-blue-600' :
+                                    tarefa.prioridade === 'baixa' ? 'text-gray-600' :
+                                    'text-gray-400'
+                                  }`}
+                                />
+                              )}
                             </div>
-                            <span
-                              className="text-xs font-semibold px-2 py-1 rounded-full"
-                              style={{
-                                backgroundColor: `${coluna.cor}1a`,
-                                color: coluna.cor,
-                              }}
-                            >
-                              {coluna.nome}
-                            </span>
+                            <p className="text-xs text-gray-500 truncate">
+                              {tarefa.clientes?.nome || 'Cliente não informado'}
+                              {tarefa.projetos?.nome ? ` • ${tarefa.projetos.nome}` : ''}
+                            </p>
                           </div>
                           <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-600">
                             {tarefa.data_vencimento && (
@@ -473,10 +475,27 @@ function GerenciarColunasModal({ isOpen, onClose, colunas, onSuccess }: Gerencia
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [newColunaData, setNewColunaData] = useState({ nome: '', cor: '#3B82F6' })
   const [editingColunaData, setEditingColunaData] = useState<Record<string, { nome: string; cor: string }>>({})
+  const [colunaFinalizadoId, setColunaFinalizadoId] = useState<string>('')
 
   useEffect(() => {
     // Ordenar colunas por ordem quando o modal abrir
     setColunasOrdenadas([...colunas].sort((a, b) => a.ordem - b.ordem))
+    
+    // Carregar configuração da coluna finalizado
+    if (isOpen) {
+      const supabase = createClient()
+      supabase
+        .from('configuracoes_sistema')
+        .select('valor')
+        .eq('chave', 'tarefas_coluna_finalizado_id')
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setColunaFinalizadoId(data.valor || '')
+          }
+        })
+    }
+    
     // Resetar estados quando o modal fechar
     if (!isOpen) {
       setEditingColunaId(null)
@@ -852,6 +871,48 @@ function GerenciarColunasModal({ isOpen, onClose, colunas, onSuccess }: Gerencia
               </button>
             </div>
           )}
+        </div>
+        
+        {/* Configuração da coluna finalizado */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Configuração</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Selecione qual coluna corresponde à etapa "Finalizado". Tarefas nesta coluna não aparecerão no calendário.
+          </p>
+          <select
+            value={colunaFinalizadoId}
+            onChange={async (e) => {
+              const novaColunaId = e.target.value
+              setColunaFinalizadoId(novaColunaId)
+              
+              const supabase = createClient()
+              // Salvar ou atualizar configuração
+              const { data: existing } = await supabase
+                .from('configuracoes_sistema')
+                .select('id')
+                .eq('chave', 'tarefas_coluna_finalizado_id')
+                .single()
+              
+              if (existing) {
+                await supabase
+                  .from('configuracoes_sistema')
+                  .update({ valor: novaColunaId })
+                  .eq('chave', 'tarefas_coluna_finalizado_id')
+              } else {
+                await supabase
+                  .from('configuracoes_sistema')
+                  .insert([{ chave: 'tarefas_coluna_finalizado_id', valor: novaColunaId }])
+              }
+            }}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          >
+            <option value="">Selecione uma coluna...</option>
+            {colunasOrdenadas.map((coluna) => (
+              <option key={coluna.id} value={coluna.id}>
+                {coluna.nome}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </Modal>

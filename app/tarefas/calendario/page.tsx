@@ -26,7 +26,9 @@ type Tarefa = {
   projetos?: Database['public']['Tables']['projetos']['Row'] | null
 }
 
-type Projeto = Database['public']['Tables']['projetos']['Row']
+type Projeto = Database['public']['Tables']['projetos']['Row'] & {
+  clientes?: Database['public']['Tables']['clientes']['Row'] | null
+}
 
 type Cobranca = Database['public']['Tables']['financeiro_lancamentos']['Row'] & {
   clientes?: Database['public']['Tables']['clientes']['Row'] | null
@@ -82,105 +84,140 @@ export default function CalendarioPage() {
     const allEvents: CalendarEvent[] = []
     const eventIds = new Set<string>() // Para evitar duplicatas
 
-    // Buscar tarefas
-    if (filters.tarefas) {
-      const { data: tarefas } = await supabase
-        .from('tarefas')
-        .select(`
-          *,
-          clientes (*),
-          projetos (*)
-        `)
-        .not('data_vencimento', 'is', null)
+    // Carregar configurações de colunas finalizadas
+    const [tarefasFinalizadoConfig, projetosFinalizadoConfig] = await Promise.all([
+      supabase
+        .from('configuracoes_sistema')
+        .select('valor')
+        .eq('chave', 'tarefas_coluna_finalizado_id')
+        .single(),
+      supabase
+        .from('configuracoes_sistema')
+        .select('valor')
+        .eq('chave', 'projetos_coluna_finalizado_id')
+        .single()
+    ])
+    
+    const tarefasColunaFinalizadoId = tarefasFinalizadoConfig.data?.valor || null
+    const projetosColunaFinalizadoId = projetosFinalizadoConfig.data?.valor || null
 
-      if (tarefas) {
-        // Remover duplicatas baseado no ID antes de processar
-        const uniqueTarefas = tarefas.reduce((acc: Tarefa[], current: Tarefa) => {
-          const exists = acc.find((item) => item.id === current.id)
-          if (!exists) {
-            acc.push(current as Tarefa)
+    // OTIMIZADO: Fazer todas as queries em paralelo com Promise.all
+    const queries: Promise<any>[] = []
+
+    if (filters.tarefas) {
+      queries.push(
+        supabase
+          .from('tarefas')
+          .select(`
+            *,
+            clientes (*),
+            projetos (*)
+          `)
+          .not('data_vencimento', 'is', null)
+          .then(({ data }) => ({ type: 'tarefas', data }))
+      )
+    }
+
+    if (filters.projetos) {
+      queries.push(
+        supabase
+          .from('projetos')
+          .select('*')
+          .not('data_fim_prevista', 'is', null)
+          .then(({ data }) => ({ type: 'projetos', data }))
+      )
+    }
+
+    if (filters.cobrancas) {
+      queries.push(
+        supabase
+          .from('financeiro_lancamentos')
+          .select(`
+            *,
+            clientes (*),
+            servicos (*)
+          `)
+          .eq('tipo', 'entrada')
+          .not('data_vencimento', 'is', null)
+          .then(({ data }) => ({ type: 'cobrancas', data }))
+      )
+    }
+
+    // Executar todas as queries em paralelo
+    const results = await Promise.all(queries)
+
+    // Processar resultados
+    let projetosData: Projeto[] = []
+    const clienteIdsSet = new Set<string>()
+
+    for (const result of results) {
+      if (result.type === 'tarefas' && result.data) {
+        // Usar Map para garantir deduplicação eficiente por ID
+        const tarefasMap = new Map<string, Tarefa>()
+        result.data.forEach((tarefa: Tarefa) => {
+          if (!tarefasMap.has(tarefa.id)) {
+            tarefasMap.set(tarefa.id, tarefa as Tarefa)
           }
-          return acc
-        }, [])
+        })
+        const uniqueTarefas = Array.from(tarefasMap.values())
 
         uniqueTarefas.forEach((tarefa) => {
-          if (tarefa.data_vencimento && !eventIds.has(`tarefa-${tarefa.id}`)) {
-            const eventDate = parseDateForCalendar(tarefa.data_vencimento)
-            if (eventDate) {
-              eventIds.add(`tarefa-${tarefa.id}`)
-              allEvents.push({
-                id: tarefa.id,
-                title: tarefa.nome,
-                date: eventDate,
-                type: 'tarefa',
-                color: '#2563EB', // Azul mais vibrante para tarefas
-                data: tarefa,
-              })
+          // Ocultar tarefas que estão na coluna finalizado
+          if (tarefasColunaFinalizadoId && tarefa.status === tarefasColunaFinalizadoId) {
+            return
+          }
+          
+          if (tarefa.data_vencimento) {
+            const eventKey = `tarefa-${tarefa.id}`
+            // Verificar se já foi adicionada para evitar duplicatas
+            if (!eventIds.has(eventKey)) {
+              const eventDate = parseDateForCalendar(tarefa.data_vencimento)
+              if (eventDate) {
+                eventIds.add(eventKey)
+                allEvents.push({
+                  id: tarefa.id,
+                  title: tarefa.nome,
+                  date: eventDate,
+                  type: 'tarefa',
+                  color: '#2563EB',
+                  data: tarefa,
+                })
+              }
             }
           }
         })
       }
-    }
 
-    // Buscar projetos
-    if (filters.projetos) {
-      const { data: projetos } = await supabase
-        .from('projetos')
-        .select('*')
-        .not('data_fim_prevista', 'is', null)
-
-      if (projetos) {
-        // Remover duplicatas baseado no ID antes de processar
-        const uniqueProjetos = projetos.reduce((acc: Projeto[], current: Projeto) => {
-          const exists = acc.find((item) => item.id === current.id)
-          if (!exists) {
-            acc.push(current)
-          }
-          return acc
-        }, [])
-
-        uniqueProjetos.forEach((projeto) => {
-          if (projeto.data_fim_prevista && !eventIds.has(`projeto-${projeto.id}`)) {
-            const eventDate = parseDateForCalendar(projeto.data_fim_prevista)
-            if (eventDate) {
-              eventIds.add(`projeto-${projeto.id}`)
-              allEvents.push({
-                id: projeto.id,
-                title: projeto.nome,
-                date: eventDate,
-                type: 'projeto',
-                color: '#059669', // Verde mais vibrante para projetos
-                data: projeto,
-              })
+      if (result.type === 'projetos' && result.data) {
+        // Usar Map para garantir deduplicação eficiente por ID
+        const projetosMap = new Map<string, Projeto>()
+        result.data.forEach((projeto: Projeto) => {
+          if (!projetosMap.has(projeto.id)) {
+            projetosMap.set(projeto.id, projeto)
+            if (projeto.cliente_principal_id) {
+              clienteIdsSet.add(projeto.cliente_principal_id)
             }
           }
         })
+        projetosData = Array.from(projetosMap.values())
       }
-    }
 
-    // Buscar cobranças
-    if (filters.cobrancas) {
-      const { data: cobrancas } = await supabase
-        .from('financeiro_lancamentos')
-        .select(`
-          *,
-          clientes (*),
-          servicos (*)
-        `)
-        .eq('tipo', 'entrada')
-        .not('data_vencimento', 'is', null)
-
-      if (cobrancas) {
-        // Remover duplicatas baseado no ID antes de processar
-        const uniqueCobrancas = cobrancas.reduce((acc: Cobranca[], current: Cobranca) => {
-          const exists = acc.find((item) => item.id === current.id)
-          if (!exists) {
-            acc.push(current)
+      if (result.type === 'cobrancas' && result.data) {
+        // Usar Map para garantir deduplicação eficiente por ID
+        const cobrancasMap = new Map<string, Cobranca>()
+        result.data.forEach((cobranca: Cobranca) => {
+          if (!cobrancasMap.has(cobranca.id)) {
+            cobrancasMap.set(cobranca.id, cobranca)
           }
-          return acc
-        }, [])
+        })
+        const uniqueCobrancas = Array.from(cobrancasMap.values())
 
         uniqueCobrancas.forEach((cobranca) => {
+          // Ocultar cobranças que já foram pagas
+          if (cobranca.status === 'pago') {
+            return
+          }
+          
           if (cobranca.data_vencimento && !eventIds.has(`cobranca-${cobranca.id}`)) {
             const eventDate = parseDateForCalendar(cobranca.data_vencimento)
             if (eventDate) {
@@ -190,7 +227,7 @@ export default function CalendarioPage() {
                 title: cobranca.descricao || 'Cobrança',
                 date: eventDate,
                 type: 'cobranca',
-                color: '#D97706', // Laranja mais vibrante para cobranças
+                color: '#D97706',
                 data: cobranca,
               })
             }
@@ -199,14 +236,77 @@ export default function CalendarioPage() {
       }
     }
 
+    // Buscar clientes dos projetos em uma única query (se necessário)
+    if (projetosData.length > 0 && clienteIdsSet.size > 0) {
+      const clienteIds = Array.from(clienteIdsSet)
+      const { data: clientes } = await supabase
+        .from('clientes')
+        .select('*')
+        .in('id', clienteIds)
+
+      const clientesMap = new Map(
+        (clientes || []).map(cliente => [cliente.id, cliente])
+      )
+
+      // Buscar lançamentos financeiros relacionados aos projetos para verificar status_servico
+      const projetoIds = projetosData.map(p => p.id)
+      const { data: lancamentosProjetos } = await supabase
+        .from('financeiro_lancamentos')
+        .select('projeto_id, status_servico')
+        .in('projeto_id', projetoIds)
+        .not('projeto_id', 'is', null)
+      
+      // Criar mapa de projeto_id -> status_servico (pegar o primeiro status encontrado)
+      const projetoStatusMap = new Map<string, string>()
+      lancamentosProjetos?.forEach(l => {
+        if (l.projeto_id && l.status_servico && !projetoStatusMap.has(l.projeto_id)) {
+          projetoStatusMap.set(l.projeto_id, l.status_servico)
+        }
+      })
+      
+      projetosData.forEach((projeto) => {
+        // Ocultar projetos que estão na coluna finalizado do kanban
+        const statusServico = projetoStatusMap.get(projeto.id)
+        if (projetosColunaFinalizadoId && statusServico === projetosColunaFinalizadoId) {
+          return
+        }
+        
+        // Também ocultar projetos com status 'concluido' (fallback)
+        if (projeto.status === 'concluido') {
+          return
+        }
+        
+        if (projeto.data_fim_prevista && !eventIds.has(`projeto-${projeto.id}`)) {
+          const eventDate = parseDateForCalendar(projeto.data_fim_prevista)
+          if (eventDate) {
+            eventIds.add(`projeto-${projeto.id}`)
+            const projetoComCliente: Projeto = {
+              ...projeto,
+              clientes: clientesMap.get(projeto.cliente_principal_id) || null
+            }
+            allEvents.push({
+              id: projeto.id,
+              title: projeto.nome,
+              date: eventDate,
+              type: 'projeto',
+              color: '#059669',
+              data: projetoComCliente,
+            })
+          }
+        }
+      })
+    }
+
     // Garantir que não há eventos duplicados no array final
-    const uniqueEvents = allEvents.reduce((acc: CalendarEvent[], current: CalendarEvent) => {
-      const exists = acc.find((item) => item.id === current.id && item.type === current.type)
-      if (!exists) {
-        acc.push(current)
+    // Usar uma chave única combinando tipo, id e timestamp da data para evitar duplicatas
+    const uniqueEventsMap = new Map<string, CalendarEvent>()
+    allEvents.forEach((event) => {
+      const uniqueKey = `${event.type}-${event.id}-${event.date.getTime()}`
+      if (!uniqueEventsMap.has(uniqueKey)) {
+        uniqueEventsMap.set(uniqueKey, event)
       }
-      return acc
-    }, [])
+    })
+    const uniqueEvents = Array.from(uniqueEventsMap.values())
 
     setEvents(uniqueEvents)
     setLoading(false)

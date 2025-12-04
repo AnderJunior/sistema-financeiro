@@ -1,16 +1,16 @@
-# Dependências
+# Dependências (serão instaladas no container)
 node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Build
+# Build (será gerado no container)
 .next
 out
 dist
 build
 
-# Ambiente
+# Ambiente (não deve ser copiado, usar variáveis de ambiente)
 .env
 .env.local
 .env.development.local
@@ -32,7 +32,7 @@ build
 .DS_Store
 Thumbs.db
 
-# Documentação
+# Documentação (não necessária no build, mas manter README se necessário)
 *.md
 !README.md
 
@@ -43,4 +43,20 @@ coverage
 # Outros
 *.log
 .cache
+
+# Arquivos temporários
+*.tmp
+*.temp
+.tmp
+.temp
+
+# Arquivos de deploy (não necessários no container)
+deploy-*.ps1
+deploy-*.sh
+*.ps1
+*.sh
+!docker-entrypoint.sh
+
+# Arquivos de configuração do sistema operacional
+root@*
 

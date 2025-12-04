@@ -61,6 +61,7 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
     valor: '',
     status: 'previsto' as 'previsto' | 'pago' | 'em_atraso' | 'cancelado',
     forma_pagamento: '' as 'pix' | 'boleto' | 'cartao' | 'transferencia' | 'dinheiro' | 'outro' | '',
+    conta_id: '',
   })
 
   const [transferenciaData, setTransferenciaData] = useState({
@@ -127,6 +128,7 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
         valor: valorFormatado,
         status: lancamento.status,
         forma_pagamento: lancamento.forma_pagamento || '',
+        conta_id: lancamento.conta_id || '',
       })
     } else if (isOpen && !lancamento) {
       // Reset form quando não estiver editando
@@ -142,6 +144,7 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
         valor: '',
         status: 'previsto',
         forma_pagamento: '',
+        conta_id: '',
       })
     }
   }, [isOpen, lancamento])
@@ -222,6 +225,20 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
       return
     }
 
+    // Validação: se o status for pago, conta_id e data_pagamento são obrigatórios
+    if (formData.status === 'pago') {
+      if (!formData.conta_id) {
+        await alert('Ao marcar o lançamento como pago, é obrigatório informar em qual banco o valor caiu.', 'Validação')
+        setLoading(false)
+        return
+      }
+      if (!formData.data_pagamento) {
+        await alert('Ao marcar o lançamento como pago, é obrigatório informar a data de pagamento.', 'Validação')
+        setLoading(false)
+        return
+      }
+    }
+
     // Formatar data de vencimento (remover hora se houver, pois o campo é DATE)
     let dataVencimentoFormatada = formData.data_vencimento || null
     if (dataVencimentoFormatada && dataVencimentoFormatada.includes('T')) {
@@ -230,6 +247,14 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
 
     const supabase = createClient()
     
+    // Se não estiver pago, remover conta_id e data_pagamento
+    let contaIdFinal = formData.conta_id || null
+    let dataPagamentoFinal = formData.data_pagamento || null
+    if (formData.status !== 'pago') {
+      contaIdFinal = null
+      dataPagamentoFinal = null
+    }
+
     const updateData = {
       tipo: activeTab,
       categoria_id: formData.categoria_id || null,
@@ -237,10 +262,11 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
       descricao: formData.descricao,
       data_competencia: formData.data_competencia,
       data_vencimento: dataVencimentoFormatada,
-      data_pagamento: formData.data_pagamento || null,
+      data_pagamento: dataPagamentoFinal,
       valor: valorNumerico,
       status: formData.status,
       forma_pagamento: formData.forma_pagamento || null,
+      conta_id: contaIdFinal,
     }
 
     let error
@@ -272,6 +298,7 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
         valor: '',
         status: 'previsto',
         forma_pagamento: '',
+        conta_id: '',
       })
       onSuccess?.()
       onClose()
@@ -296,6 +323,7 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
           valor: '',
           status: 'previsto',
           forma_pagamento: '',
+          conta_id: '',
         })
         setTransferenciaData({
           banco_origem_id: '',
@@ -507,18 +535,6 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Data de Pagamento (Opcional)
-            </label>
-            <input
-              type="date"
-              value={formData.data_pagamento}
-              onChange={(e) => setFormData({ ...formData, data_pagamento: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
               Valor *
             </label>
             <input
@@ -538,7 +554,19 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
             <select
               required
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+              onChange={(e) => {
+                const newStatus = e.target.value as any
+                setFormData({ 
+                  ...formData, 
+                  status: newStatus,
+                  // Se mudar para pago e não tiver data de pagamento, usar data atual
+                  data_pagamento: newStatus === 'pago' 
+                    ? (formData.data_pagamento || new Date().toISOString().split('T')[0])
+                    : '',
+                  // Se mudar para não pago, limpar conta_id
+                  conta_id: newStatus === 'pago' ? formData.conta_id : '',
+                })
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
               <option value="previsto">Previsto</option>
@@ -547,6 +575,45 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
               <option value="cancelado">Cancelado</option>
             </select>
           </div>
+
+          {formData.status === 'pago' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data de Pagamento *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={formData.data_pagamento}
+                  onChange={(e) => setFormData({ ...formData, data_pagamento: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Banco recebedor *
+                </label>
+                <select
+                  required
+                  value={formData.conta_id}
+                  onChange={(e) => setFormData({ ...formData, conta_id: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="">Selecione o banco</option>
+                  {contasFinanceiras.map((conta) => (
+                    <option key={conta.id} value={conta.id}>
+                      {conta.nome}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Selecione em qual banco o valor foi recebido/pago
+                </p>
+              </div>
+            </>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

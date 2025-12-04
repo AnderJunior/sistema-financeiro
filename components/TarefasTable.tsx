@@ -1,7 +1,7 @@
 'use client'
 
 import { formatDate } from '@/lib/utils'
-import { Search, List, LayoutGrid, Trash2 } from 'lucide-react'
+import { Search, List, LayoutGrid, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { TarefaDetailModal } from '@/components/modals/TarefaDetailModal'
 import { TarefaKanbanColuna } from '@/types/kanban.types'
@@ -44,22 +44,79 @@ interface TarefasTableProps {
   kanbanColumns: TarefaKanbanColuna[]
 }
 
+type SortField = 'nome' | 'cliente' | 'data_vencimento' | 'status' | null
+type SortDirection = 'asc' | 'desc'
+
 export function TarefasTable({ tarefas, onTarefaUpdate, viewMode, onViewModeChange, kanbanColumns }: TarefasTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTarefa, setSelectedTarefa] = useState<Tarefa | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [sortField, setSortField] = useState<SortField>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const { confirm, alert } = useModal()
 
   const columnMap = useMemo(() => {
     return new Map(kanbanColumns.map((coluna) => [coluna.id, coluna]))
   }, [kanbanColumns])
 
-  const filteredTarefas = tarefas.filter(tarefa =>
-    tarefa.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tarefa.descricao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tarefa.clientes?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tarefa.projetos?.nome?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredTarefas = useMemo(() => {
+    let filtered = tarefas.filter(tarefa =>
+      tarefa.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tarefa.descricao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tarefa.clientes?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tarefa.projetos?.nome?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+
+    if (sortField) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue: string | number | null = null
+        let bValue: string | number | null = null
+
+        switch (sortField) {
+          case 'nome':
+            aValue = a.nome?.toLowerCase() || ''
+            bValue = b.nome?.toLowerCase() || ''
+            break
+          case 'cliente':
+            aValue = a.clientes?.nome?.toLowerCase() || ''
+            bValue = b.clientes?.nome?.toLowerCase() || ''
+            break
+          case 'data_vencimento':
+            aValue = a.data_vencimento ? new Date(a.data_vencimento).getTime() : 0
+            bValue = b.data_vencimento ? new Date(b.data_vencimento).getTime() : 0
+            break
+          case 'status':
+            const aStatus = columnMap.get(a.status)?.nome || ''
+            const bStatus = columnMap.get(b.status)?.nome || ''
+            aValue = aStatus.toLowerCase()
+            bValue = bStatus.toLowerCase()
+            break
+        }
+
+        // Valores nulos/vazios sempre vão para o final
+        if (aValue === null || aValue === '') return 1
+        if (bValue === null || bValue === '') return -1
+
+        // Comparação normal
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+        return 0
+      })
+    }
+
+    return filtered
+  }, [tarefas, searchTerm, sortField, sortDirection, columnMap])
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Se já está ordenando por este campo, inverte a direção
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Se é um novo campo, ordena ascendente
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
 
   const getStatusBadge = (columnId: string | null) => {
     const column = columnId ? columnMap.get(columnId) : undefined
@@ -148,10 +205,66 @@ export function TarefasTable({ tarefas, onTarefaUpdate, viewMode, onViewModeChan
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200">
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Tarefa</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Cliente/Projeto</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Data Vencimento</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Status</th>
+              <th 
+                className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                onClick={() => handleSort('nome')}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Tarefa</span>
+                  {sortField === 'nome' && (
+                    sortDirection === 'asc' ? (
+                      <ChevronUp className="w-4 h-4 text-primary-600" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-primary-600" />
+                    )
+                  )}
+                </div>
+              </th>
+              <th 
+                className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                onClick={() => handleSort('cliente')}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Cliente/Projeto</span>
+                  {sortField === 'cliente' && (
+                    sortDirection === 'asc' ? (
+                      <ChevronUp className="w-4 h-4 text-primary-600" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-primary-600" />
+                    )
+                  )}
+                </div>
+              </th>
+              <th 
+                className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                onClick={() => handleSort('data_vencimento')}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Data Vencimento</span>
+                  {sortField === 'data_vencimento' && (
+                    sortDirection === 'asc' ? (
+                      <ChevronUp className="w-4 h-4 text-primary-600" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-primary-600" />
+                    )
+                  )}
+                </div>
+              </th>
+              <th 
+                className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                onClick={() => handleSort('status')}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Status</span>
+                  {sortField === 'status' && (
+                    sortDirection === 'asc' ? (
+                      <ChevronUp className="w-4 h-4 text-primary-600" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-primary-600" />
+                    )
+                  )}
+                </div>
+              </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Ações</th>
             </tr>
           </thead>

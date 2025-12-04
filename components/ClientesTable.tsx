@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
 import { Database } from '@/types/database.types'
-import { Eye, Edit, Trash2, Search, Settings2, ChevronDown, List, LayoutGrid } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { Eye, Edit, Trash2, Search, Settings2, ChevronDown, ChevronUp, List, LayoutGrid } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ClienteModal } from './modals/ClienteModal'
 import { useModal } from '@/contexts/ModalContext'
@@ -29,6 +29,8 @@ interface ClientesTableProps {
 }
 
 type ColumnKey = 'nome' | 'tipo_pessoa' | 'cpf_cnpj' | 'email' | 'status' | 'data_cadastro' | 'telefone' | 'origem' | 'grupo'
+type SortField = ColumnKey | null
+type SortDirection = 'asc' | 'desc'
 
 interface ColumnConfig {
   key: ColumnKey
@@ -87,17 +89,106 @@ export function ClientesTable({ clientes: initialClientes, viewMode, onViewModeC
   })
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false)
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
+  const [sortField, setSortField] = useState<SortField>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   // Sincronizar com mudanças do parent component
   useEffect(() => {
     setClientes(initialClientes)
   }, [initialClientes])
 
-  const filteredClientes = clientes.filter(cliente =>
-    cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.cpf_cnpj?.includes(searchTerm)
-  )
+  const filteredClientes = useMemo(() => {
+    let filtered = clientes.filter(cliente =>
+      cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.cpf_cnpj?.includes(searchTerm)
+    )
+
+    if (sortField) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue: string | number | null = null
+        let bValue: string | number | null = null
+
+        switch (sortField) {
+          case 'nome':
+            aValue = a.nome?.toLowerCase() || ''
+            bValue = b.nome?.toLowerCase() || ''
+            break
+          case 'tipo_pessoa':
+            aValue = a.tipo_pessoa?.toLowerCase() || ''
+            bValue = b.tipo_pessoa?.toLowerCase() || ''
+            break
+          case 'cpf_cnpj':
+            aValue = a.cpf_cnpj?.toLowerCase() || ''
+            bValue = b.cpf_cnpj?.toLowerCase() || ''
+            break
+          case 'email':
+            aValue = a.email?.toLowerCase() || ''
+            bValue = b.email?.toLowerCase() || ''
+            break
+          case 'telefone':
+            aValue = a.telefone?.toLowerCase() || ''
+            bValue = b.telefone?.toLowerCase() || ''
+            break
+          case 'status':
+            // Ordenar status: a_iniciar (1), em_andamento (2), finalizado (3)
+            const statusOrder: Record<string, number> = {
+              'a_iniciar': 1,
+              'em_andamento': 2,
+              'finalizado': 3,
+            }
+            aValue = statusOrder[a.status] || 9999
+            bValue = statusOrder[b.status] || 9999
+            break
+          case 'data_cadastro':
+            aValue = a.data_cadastro ? new Date(a.data_cadastro).getTime() : null
+            bValue = b.data_cadastro ? new Date(b.data_cadastro).getTime() : null
+            break
+          case 'origem':
+            aValue = a.origem?.toLowerCase() || ''
+            bValue = b.origem?.toLowerCase() || ''
+            break
+          case 'grupo':
+            const aGrupos = a.grupos?.filter(cg => cg.grupos).map(cg => cg.grupos.nome).join(', ') || ''
+            const bGrupos = b.grupos?.filter(cg => cg.grupos).map(cg => cg.grupos.nome).join(', ') || ''
+            aValue = aGrupos.toLowerCase()
+            bValue = bGrupos.toLowerCase()
+            break
+        }
+
+        // Valores nulos/vazios sempre vão para o final
+        // Para status, valores não encontrados (9999) já vão para o final
+        if (sortField === 'status') {
+          // Para status, já tratamos valores não encontrados com 9999
+          if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+          if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+          return 0
+        }
+        
+        // Para outros campos, tratar valores nulos/vazios
+        if (aValue === null || aValue === '') return 1
+        if (bValue === null || bValue === '') return -1
+
+        // Comparação normal
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+        return 0
+      })
+    }
+
+    return filtered
+  }, [clientes, searchTerm, sortField, sortDirection])
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Se já está ordenando por este campo, inverte a direção
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Se é um novo campo, ordena ascendente
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm(
@@ -287,31 +378,157 @@ export function ClientesTable({ clientes: initialClientes, viewMode, onViewModeC
           <thead>
             <tr className="border-b border-gray-200">
               {visibleColumns.has('nome') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Nome</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('nome')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Nome</span>
+                    {sortField === 'nome' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               {visibleColumns.has('tipo_pessoa') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Tipo</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('tipo_pessoa')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Tipo</span>
+                    {sortField === 'tipo_pessoa' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               {visibleColumns.has('cpf_cnpj') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">CPF/CNPJ</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('cpf_cnpj')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>CPF/CNPJ</span>
+                    {sortField === 'cpf_cnpj' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               {visibleColumns.has('email') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Email</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('email')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Email</span>
+                    {sortField === 'email' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               {visibleColumns.has('telefone') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Telefone</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('telefone')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Telefone</span>
+                    {sortField === 'telefone' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               {visibleColumns.has('status') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Status</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('status')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Status</span>
+                    {sortField === 'status' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               {visibleColumns.has('data_cadastro') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Data Cadastro</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('data_cadastro')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Data Cadastro</span>
+                    {sortField === 'data_cadastro' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               {visibleColumns.has('origem') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Origem</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('origem')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Origem</span>
+                    {sortField === 'origem' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               {visibleColumns.has('grupo') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Grupo</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('grupo')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Grupo</span>
+                    {sortField === 'grupo' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Ações</th>
             </tr>

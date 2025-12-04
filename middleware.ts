@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
@@ -75,7 +76,7 @@ export async function middleware(request: NextRequest) {
   // })
 
   // Rotas públicas que não precisam de autenticação
-  const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password']
+  const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/licenca-invalida']
   const isPublicRoute = publicRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   )
@@ -106,6 +107,53 @@ export async function middleware(request: NextRequest) {
       redirectResponse.cookies.set(cookie.name, cookie.value)
     })
     return redirectResponse
+  }
+
+  // Verificar licença se o usuário está autenticado e não está em rota pública/API
+  if (user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/api/')) {
+    try {
+      // Usar Service Role Key para verificar licença (acesso à tabela assinantes)
+      const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      )
+
+      // Verificar se o email do usuário tem licença ativa
+      const { data: assinante, error } = await supabaseAdmin
+        .from('assinantes')
+        .select('status, data_vencimento')
+        .eq('email', user.email?.toLowerCase().trim())
+        .eq('status', 'ativo')
+        .single()
+
+      // Se não encontrou assinante ou está inativo
+      if (error || !assinante) {
+        // Permitir acesso à página de licença inválida
+        if (request.nextUrl.pathname === '/licenca-invalida') {
+          return response
+        }
+        
+        // Redirecionar para página de licença inválida
+        return NextResponse.redirect(new URL('/licenca-invalida', request.url))
+      }
+
+      // Verificar se a licença não está vencida
+      if (assinante.data_vencimento && new Date(assinante.data_vencimento) < new Date()) {
+        if (request.nextUrl.pathname === '/licenca-invalida') {
+          return response
+        }
+        return NextResponse.redirect(new URL('/licenca-invalida', request.url))
+      }
+    } catch (error) {
+      // Em caso de erro, permitir acesso (não bloquear por falha técnica)
+      console.error('[Middleware] Erro ao verificar licença:', error)
+    }
   }
   
   // console.log('[Middleware] ✅ Permitindo acesso a:', request.nextUrl.pathname)

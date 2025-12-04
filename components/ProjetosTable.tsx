@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { Database } from '@/types/database.types'
-import { Eye, Search, Settings2, ChevronDown, List, LayoutGrid, Package } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { Eye, Search, Settings2, ChevronDown, ChevronUp, List, LayoutGrid, Package } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Lancamento = Database['public']['Tables']['financeiro_lancamentos']['Row'] & {
@@ -31,6 +31,8 @@ interface ProjetosTableProps {
 }
 
 type ColumnKey = 'servico' | 'cliente' | 'valor' | 'data_vencimento' | 'status_servico'
+type SortField = 'cliente' | 'servico' | 'valor' | 'data_vencimento' | 'status_servico' | null
+type SortDirection = 'asc' | 'desc'
 
 interface ColumnConfig {
   key: ColumnKey
@@ -41,8 +43,8 @@ interface ColumnConfig {
 const STORAGE_KEY = 'projetos_table_visible_columns'
 
 const availableColumns: ColumnConfig[] = [
-  { key: 'servico', label: 'Serviço', defaultVisible: true },
   { key: 'cliente', label: 'Cliente', defaultVisible: true },
+  { key: 'servico', label: 'Serviço', defaultVisible: true },
   { key: 'valor', label: 'Valor', defaultVisible: true },
   { key: 'data_vencimento', label: 'Data Vencimento', defaultVisible: true },
   { key: 'status_servico', label: 'Status', defaultVisible: true },
@@ -80,6 +82,8 @@ export function ProjetosTable({ projetos: initialProjetos, viewMode, onViewModeC
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false)
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
   const [colunasKanban, setColunasKanban] = useState<KanbanColuna[]>([])
+  const [sortField, setSortField] = useState<SortField>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   useEffect(() => {
     setProjetos(initialProjetos)
@@ -160,11 +164,78 @@ export function ProjetosTable({ projetos: initialProjetos, viewMode, onViewModeC
     }
   }
 
-  const filteredProjetos = projetos.filter(projeto =>
-    projeto.servicos?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    projeto.clientes?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    projeto.descricao?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredProjetos = useMemo(() => {
+    let filtered = projetos.filter(projeto =>
+      projeto.servicos?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      projeto.clientes?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      projeto.descricao?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+
+    if (sortField) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue: string | number | null = null
+        let bValue: string | number | null = null
+
+        switch (sortField) {
+          case 'cliente':
+            aValue = a.clientes?.nome?.toLowerCase() || ''
+            bValue = b.clientes?.nome?.toLowerCase() || ''
+            break
+          case 'servico':
+            aValue = a.servicos?.nome?.toLowerCase() || ''
+            bValue = b.servicos?.nome?.toLowerCase() || ''
+            break
+          case 'valor':
+            aValue = a.valor ? Number(a.valor) : null
+            bValue = b.valor ? Number(b.valor) : null
+            break
+          case 'data_vencimento':
+            aValue = a.data_vencimento ? new Date(a.data_vencimento).getTime() : null
+            bValue = b.data_vencimento ? new Date(b.data_vencimento).getTime() : null
+            break
+          case 'status_servico':
+            // Usar a ordem do kanban ao invés do nome alfabeticamente
+            const aColuna = colunasKanban.find(c => c.id === a.status_servico)
+            const bColuna = colunasKanban.find(c => c.id === b.status_servico)
+            // Se não encontrar a coluna, usar um número alto para ir para o final
+            aValue = aColuna ? aColuna.ordem : 9999
+            bValue = bColuna ? bColuna.ordem : 9999
+            break
+        }
+
+        // Valores nulos/vazios sempre vão para o final
+        // Para status, valores não encontrados (9999) já vão para o final
+        if (sortField === 'status_servico') {
+          // Para status, já tratamos valores não encontrados com 9999
+          if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+          if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+          return 0
+        }
+        
+        // Para outros campos, tratar valores nulos/vazios
+        if (aValue === null || aValue === '') return 1
+        if (bValue === null || bValue === '') return -1
+
+        // Comparação normal
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+        return 0
+      })
+    }
+
+    return filtered
+  }, [projetos, searchTerm, sortField, sortDirection, colunasKanban])
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Se já está ordenando por este campo, inverte a direção
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Se é um novo campo, ordena ascendente
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -370,20 +441,90 @@ export function ProjetosTable({ projetos: initialProjetos, viewMode, onViewModeC
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200">
-              {visibleColumns.has('servico') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Serviço</th>
-              )}
               {visibleColumns.has('cliente') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Cliente</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('cliente')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Cliente</span>
+                    {sortField === 'cliente' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
+              )}
+              {visibleColumns.has('servico') && (
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('servico')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Serviço</span>
+                    {sortField === 'servico' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               {visibleColumns.has('valor') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Valor</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('valor')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Valor</span>
+                    {sortField === 'valor' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               {visibleColumns.has('data_vencimento') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Data Vencimento</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('data_vencimento')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Data Vencimento</span>
+                    {sortField === 'data_vencimento' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               {visibleColumns.has('status_servico') && (
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Status</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSort('status_servico')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Status</span>
+                    {sortField === 'status_servico' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
               )}
               <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Ações</th>
             </tr>
@@ -402,6 +543,17 @@ export function ProjetosTable({ projetos: initialProjetos, viewMode, onViewModeC
                   className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                   onClick={() => projeto.cliente_id && router.push(`/clientes/${projeto.cliente_id}`)}
                 >
+                  {visibleColumns.has('cliente') && (
+                    <td className="py-3 px-4">
+                      <Link
+                        href={projeto.cliente_id ? `/clientes/${projeto.cliente_id}` : '#'}
+                        className="text-sm font-semibold text-gray-900 hover:text-primary-700"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {projeto.clientes?.nome || 'Cliente não encontrado'}
+                      </Link>
+                    </td>
+                  )}
                   {visibleColumns.has('servico') && (
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
@@ -410,17 +562,6 @@ export function ProjetosTable({ projetos: initialProjetos, viewMode, onViewModeC
                           {projeto.servicos?.nome || 'Serviço não encontrado'}
                         </span>
                       </div>
-                    </td>
-                  )}
-                  {visibleColumns.has('cliente') && (
-                    <td className="py-3 px-4">
-                      <Link
-                        href={projeto.cliente_id ? `/clientes/${projeto.cliente_id}` : '#'}
-                        className="text-sm text-primary-600 hover:text-primary-700"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {projeto.clientes?.nome || 'Cliente não encontrado'}
-                      </Link>
                     </td>
                   )}
                   {visibleColumns.has('valor') && (

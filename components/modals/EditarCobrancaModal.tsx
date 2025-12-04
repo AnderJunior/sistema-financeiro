@@ -43,10 +43,13 @@ function parseCurrencyValue(formattedValue: string): number {
   return parseFloat(numbers) / 100
 }
 
+type ContaFinanceira = Database['public']['Tables']['contas_financeiras']['Row']
+
 export function EditarCobrancaModal({ isOpen, onClose, onSuccess, cobranca }: EditarCobrancaModalProps) {
   const { alert } = useModal()
   const [loading, setLoading] = useState(false)
   const [servico, setServico] = useState<Database['public']['Tables']['servicos']['Row'] | null>(null)
+  const [contasFinanceiras, setContasFinanceiras] = useState<ContaFinanceira[]>([])
   const [formData, setFormData] = useState({
     descricao: '',
     valor: '',
@@ -57,9 +60,29 @@ export function EditarCobrancaModal({ isOpen, onClose, onSuccess, cobranca }: Ed
     forma_pagamento: '' as 'pix' | 'boleto' | 'cartao' | 'transferencia' | 'dinheiro' | 'outro' | '',
     observacoes: '',
     unidade_cobranca: 'mensal' as 'mensal' | 'semestral' | 'anual' | 'projeto',
+    conta_id: '',
   })
 
   const isAssinatura = servico?.tipo === 'assinatura'
+
+  // Carregar contas financeiras quando o modal abrir
+  useEffect(() => {
+    if (isOpen) {
+      async function loadContasFinanceiras() {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('contas_financeiras')
+          .select('*')
+          .eq('ativo', true)
+          .order('nome', { ascending: true })
+        
+        if (data) {
+          setContasFinanceiras(data)
+        }
+      }
+      loadContasFinanceiras()
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (isOpen && cobranca) {
@@ -116,6 +139,7 @@ export function EditarCobrancaModal({ isOpen, onClose, onSuccess, cobranca }: Ed
         forma_pagamento: cobranca.forma_pagamento || '',
         observacoes: '',
         unidade_cobranca: (cobranca.servicos?.unidade_cobranca || 'mensal') as 'mensal' | 'semestral' | 'anual' | 'projeto',
+        conta_id: cobranca.conta_id || '',
       })
     }
   }, [isOpen, cobranca])
@@ -132,6 +156,13 @@ export function EditarCobrancaModal({ isOpen, onClose, onSuccess, cobranca }: Ed
     // Validação: se for assinatura, data_proxima_assinatura é obrigatória
     if (isAssinatura && !formData.data_proxima_assinatura) {
       await alert('Para serviços de assinatura, é obrigatório informar a Data da Próxima Assinatura.', 'Validação')
+      setLoading(false)
+      return
+    }
+
+    // Validação: se o status for pago, conta_id é obrigatória
+    if (formData.status === 'pago' && !formData.conta_id) {
+      await alert('Ao marcar a cobrança como paga, é obrigatório informar em qual banco o valor caiu.', 'Validação')
       setLoading(false)
       return
     }
@@ -155,9 +186,11 @@ export function EditarCobrancaModal({ isOpen, onClose, onSuccess, cobranca }: Ed
       dataPagamento = new Date().toISOString().split('T')[0]
     }
 
-    // Se não estiver pago, remover data de pagamento
+    // Se não estiver pago, remover data de pagamento e conta_id
+    let contaIdFinal = formData.conta_id || null
     if (statusFinal !== 'pago') {
       dataPagamento = null
+      contaIdFinal = null
     }
 
     // Para assinaturas, usar data_proxima_assinatura como data_vencimento
@@ -185,6 +218,7 @@ export function EditarCobrancaModal({ isOpen, onClose, onSuccess, cobranca }: Ed
         data_pagamento: dataPagamento,
         status: statusFinal,
         forma_pagamento: formData.forma_pagamento || null,
+        conta_id: contaIdFinal,
       })
       .eq('id', cobranca.id)
 
@@ -207,6 +241,8 @@ export function EditarCobrancaModal({ isOpen, onClose, onSuccess, cobranca }: Ed
       data_pagamento: newStatus === 'pago' && !formData.data_pagamento 
         ? new Date().toISOString().split('T')[0] 
         : formData.data_pagamento,
+      // Se mudar para não pago, limpar conta_id
+      conta_id: newStatus === 'pago' ? formData.conta_id : '',
     })
   }
 
@@ -332,17 +368,40 @@ export function EditarCobrancaModal({ isOpen, onClose, onSuccess, cobranca }: Ed
         </div>
 
         {formData.status === 'pago' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Data de Pagamento
-            </label>
-            <input
-              type="date"
-              value={formData.data_pagamento}
-              onChange={(e) => setFormData({ ...formData, data_pagamento: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data de Pagamento
+              </label>
+              <input
+                type="date"
+                value={formData.data_pagamento}
+                onChange={(e) => setFormData({ ...formData, data_pagamento: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Banco onde o valor caiu *
+              </label>
+              <select
+                required
+                value={formData.conta_id}
+                onChange={(e) => setFormData({ ...formData, conta_id: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="">Selecione o banco</option>
+                {contasFinanceiras.map((conta) => (
+                  <option key={conta.id} value={conta.id}>
+                    {conta.nome}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Selecione em qual banco o valor foi recebido
+              </p>
+            </div>
+          </>
         )}
 
         <div>

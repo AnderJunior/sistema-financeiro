@@ -29,23 +29,34 @@ export function ClientesPorMesChart() {
         })
       }
 
-      const chartData = await Promise.all(
-        meses.map(async (m) => {
-          const primeiroDia = new Date(m.ano, m.mesNum - 1, 1)
-          const ultimoDia = new Date(m.ano, m.mesNum, 0, 23, 59, 59, 999)
+      // OTIMIZADO: Uma única query para buscar todos os clientes dos últimos 6 meses
+      const primeiroMes = meses[0]
+      const ultimoMes = meses[meses.length - 1]
+      const primeiroDia = new Date(primeiroMes.ano, primeiroMes.mesNum - 1, 1)
+      const ultimoDia = new Date(ultimoMes.ano, ultimoMes.mesNum, 0, 23, 59, 59, 999)
 
-          const { count } = await supabase
-            .from('clientes')
-            .select('*', { count: 'exact', head: true })
-            .gte('data_cadastro', primeiroDia.toISOString())
-            .lte('data_cadastro', ultimoDia.toISOString())
+      const { data: clientes } = await supabase
+        .from('clientes')
+        .select('data_cadastro')
+        .gte('data_cadastro', primeiroDia.toISOString())
+        .lte('data_cadastro', ultimoDia.toISOString())
 
-          return {
-            mes: m.mes,
-            quantidade: count || 0,
-          }
-        })
-      )
+      // Agrupar clientes por mês no cliente
+      const chartData = meses.map((m) => {
+        const primeiroDiaMes = new Date(m.ano, m.mesNum - 1, 1)
+        const ultimoDiaMes = new Date(m.ano, m.mesNum, 0, 23, 59, 59, 999)
+
+        const quantidade = (clientes || []).filter((cliente) => {
+          if (!cliente.data_cadastro) return false
+          const dataCadastro = new Date(cliente.data_cadastro)
+          return dataCadastro >= primeiroDiaMes && dataCadastro <= ultimoDiaMes
+        }).length
+
+        return {
+          mes: m.mes,
+          quantidade,
+        }
+      })
 
       setChartData(chartData)
       setLoading(false)

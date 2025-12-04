@@ -7,8 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/Card'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Database } from '@/types/database.types'
-import { AlertCircle, CheckCircle2, Clock, Edit, Copy } from 'lucide-react'
-import { EditarCobrancaModal } from './modals/EditarCobrancaModal'
+import { AlertCircle, CheckCircle2, Clock, Copy } from 'lucide-react'
 
 type Lancamento = Database['public']['Tables']['financeiro_lancamentos']['Row'] & {
   servicos?: Database['public']['Tables']['servicos']['Row']
@@ -25,8 +24,6 @@ export function CobrancasCliente({ clienteId }: CobrancasClienteProps) {
   const { alert } = useModal()
   const [cobrancas, setCobrancas] = useState<Lancamento[]>([])
   const [loading, setLoading] = useState(true)
-  const [editingCobranca, setEditingCobranca] = useState<Lancamento | null>(null)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
   const loadCobrancas = useCallback(async () => {
     const supabase = createClient()
@@ -162,51 +159,6 @@ export function CobrancasCliente({ clienteId }: CobrancasClienteProps) {
     }
   }
 
-  const handleStatusChange = async (cobranca: Lancamento, newStatus: StatusCobranca) => {
-    const supabase = createClient()
-    
-    // Verificar se está atrasado automaticamente
-    const hoje = new Date()
-    hoje.setHours(0, 0, 0, 0)
-    const vencimento = cobranca.data_vencimento ? new Date(cobranca.data_vencimento) : null
-    let statusFinal = newStatus
-
-    // Se a data de vencimento for menor que hoje e o status não for 'pago', marcar como atrasado
-    if (vencimento && vencimento < hoje && newStatus !== 'pago') {
-      statusFinal = 'em_atraso'
-    }
-
-    // Se marcar como pago e não tiver data de pagamento, usar data atual
-    let dataPagamento = cobranca.data_pagamento || null
-    if (statusFinal === 'pago' && !dataPagamento) {
-      dataPagamento = new Date().toISOString().split('T')[0]
-    }
-
-    // Se não estiver pago, remover data de pagamento
-    if (statusFinal !== 'pago') {
-      dataPagamento = null
-    }
-
-    const { error } = await supabase
-      .from('financeiro_lancamentos')
-      .update({
-        status: statusFinal,
-        data_pagamento: dataPagamento,
-      })
-      .eq('id', cobranca.id)
-
-    if (!error) {
-      loadCobrancas()
-    } else {
-      await alert('Erro ao atualizar status: ' + error.message, 'Erro')
-    }
-  }
-
-  const handleEditClick = (cobranca: Lancamento) => {
-    setEditingCobranca(cobranca)
-    setIsEditModalOpen(true)
-  }
-
   const handleCopyLink = async (invoiceUrl: string) => {
     try {
       await navigator.clipboard.writeText(invoiceUrl)
@@ -222,18 +174,6 @@ export function CobrancasCliente({ clienteId }: CobrancasClienteProps) {
     }
   }
 
-  const getStatusColor = (status: StatusCobranca) => {
-    switch (status) {
-      case 'previsto':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'pago':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'em_atraso':
-        return 'bg-red-100 text-red-800 border-red-200'
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
 
   if (loading) {
     return (
@@ -286,16 +226,6 @@ export function CobrancasCliente({ clienteId }: CobrancasClienteProps) {
                         {formatCurrency(Number(cobranca.valor))}
                       </p>
                     </div>
-                    <select
-                      value={statusInfo.status}
-                      onChange={(e) => handleStatusChange(cobranca, e.target.value as StatusCobranca)}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 cursor-pointer ${getStatusColor(statusInfo.status)}`}
-                      title="Status da cobrança"
-                    >
-                      <option value="previsto">Pendente</option>
-                      <option value="pago">Pago</option>
-                      <option value="em_atraso">Atrasado</option>
-                    </select>
                     {cobranca.invoice_url && (
                       <button
                         onClick={() => handleCopyLink(cobranca.invoice_url!)}
@@ -305,13 +235,6 @@ export function CobrancasCliente({ clienteId }: CobrancasClienteProps) {
                         <Copy className="w-4 h-4" />
                       </button>
                     )}
-                    <button
-                      onClick={() => handleEditClick(cobranca)}
-                      className="p-2 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
-                      title="Editar cobrança"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
                   </div>
                 </div>
               </div>
@@ -319,20 +242,6 @@ export function CobrancasCliente({ clienteId }: CobrancasClienteProps) {
           })}
         </div>
       )}
-
-      <EditarCobrancaModal
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false)
-          setEditingCobranca(null)
-        }}
-        onSuccess={() => {
-          loadCobrancas()
-          setIsEditModalOpen(false)
-          setEditingCobranca(null)
-        }}
-        cobranca={editingCobranca}
-      />
       </Card>
     </div>
   )

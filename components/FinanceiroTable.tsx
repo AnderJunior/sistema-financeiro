@@ -2,8 +2,8 @@
 
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Database } from '@/types/database.types'
-import { Edit, Trash2, ArrowUpRight, ArrowDownRight, Copy, ArrowRight } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { Edit, Trash2, ArrowUpRight, ArrowDownRight, Copy, ArrowRight, ChevronUp, ChevronDown } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useModal } from '@/contexts/ModalContext'
 import { LancamentoModal } from '@/components/modals/LancamentoModal'
@@ -30,12 +30,19 @@ interface FinanceiroTableProps {
   transferencias?: Transferencia[]
 }
 
+type SortFieldLancamento = 'cliente' | 'categoria' | 'data' | 'vencimento' | 'status' | 'valor' | null
+type SortFieldTransferencia = 'conta_origem' | 'conta_destino' | 'data' | 'descricao' | 'valor' | null
+type SortDirection = 'asc' | 'desc'
+
 export function FinanceiroTable({ lancamentos: initialLancamentos, transferencias = [] }: FinanceiroTableProps) {
   const { alert, confirm } = useModal()
   const [lancamentos, setLancamentos] = useState(initialLancamentos)
   const [filter, setFilter] = useState<'all' | 'entrada' | 'saida' | 'transferencia'>('all')
   const [editingLancamento, setEditingLancamento] = useState<Lancamento | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [sortFieldLancamento, setSortFieldLancamento] = useState<SortFieldLancamento>(null)
+  const [sortFieldTransferencia, setSortFieldTransferencia] = useState<SortFieldTransferencia>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   // Sincronizar com mudanças do parent component
   useEffect(() => {
@@ -59,9 +66,134 @@ export function FinanceiroTable({ lancamentos: initialLancamentos, transferencia
     setEditingLancamento(null)
   }
 
-  const filteredLancamentos = filter === 'all'
-    ? lancamentos
-    : lancamentos.filter(l => l.tipo === filter)
+  const filteredLancamentos = useMemo(() => {
+    let filtered = filter === 'all'
+      ? lancamentos
+      : lancamentos.filter(l => l.tipo === filter)
+
+    if (sortFieldLancamento) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue: string | number | null = null
+        let bValue: string | number | null = null
+
+        switch (sortFieldLancamento) {
+          case 'cliente':
+            aValue = a.clientes?.nome?.toLowerCase() || ''
+            bValue = b.clientes?.nome?.toLowerCase() || ''
+            break
+          case 'categoria':
+            aValue = a.financeiro_categorias?.nome?.toLowerCase() || ''
+            bValue = b.financeiro_categorias?.nome?.toLowerCase() || ''
+            break
+          case 'data':
+            aValue = a.data_competencia ? new Date(a.data_competencia).getTime() : null
+            bValue = b.data_competencia ? new Date(b.data_competencia).getTime() : null
+            break
+          case 'vencimento':
+            aValue = a.data_vencimento ? new Date(a.data_vencimento).getTime() : null
+            bValue = b.data_vencimento ? new Date(b.data_vencimento).getTime() : null
+            break
+          case 'status':
+            // Ordenar status: previsto (1), pago (2), em_atraso (3), cancelado (4)
+            const statusOrder: Record<string, number> = {
+              'previsto': 1,
+              'pago': 2,
+              'em_atraso': 3,
+              'cancelado': 4,
+            }
+            aValue = statusOrder[a.status] || 9999
+            bValue = statusOrder[b.status] || 9999
+            break
+          case 'valor':
+            aValue = a.valor ? Number(a.valor) : null
+            bValue = b.valor ? Number(b.valor) : null
+            break
+        }
+
+        // Valores nulos/vazios sempre vão para o final
+        // Para status, valores não encontrados (9999) já vão para o final
+        if (sortFieldLancamento === 'status') {
+          if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+          if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+          return 0
+        }
+        
+        // Para outros campos, tratar valores nulos/vazios
+        if (aValue === null || aValue === '') return 1
+        if (bValue === null || bValue === '') return -1
+
+        // Comparação normal
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+        return 0
+      })
+    }
+
+    return filtered
+  }, [lancamentos, filter, sortFieldLancamento, sortDirection])
+
+  const sortedTransferencias = useMemo(() => {
+    if (!sortFieldTransferencia) return transferencias
+
+    return [...transferencias].sort((a, b) => {
+      let aValue: string | number | null = null
+      let bValue: string | number | null = null
+
+      switch (sortFieldTransferencia) {
+        case 'conta_origem':
+          aValue = a.banco_origem?.nome?.toLowerCase() || ''
+          bValue = b.banco_origem?.nome?.toLowerCase() || ''
+          break
+        case 'conta_destino':
+          aValue = a.banco_recebedor?.nome?.toLowerCase() || ''
+          bValue = b.banco_recebedor?.nome?.toLowerCase() || ''
+          break
+        case 'data':
+          aValue = a.data_transferencia ? new Date(a.data_transferencia).getTime() : null
+          bValue = b.data_transferencia ? new Date(b.data_transferencia).getTime() : null
+          break
+        case 'descricao':
+          aValue = a.descricao?.toLowerCase() || ''
+          bValue = b.descricao?.toLowerCase() || ''
+          break
+        case 'valor':
+          aValue = a.valor_enviado ? Number(a.valor_enviado) : null
+          bValue = b.valor_enviado ? Number(b.valor_enviado) : null
+          break
+      }
+
+      // Valores nulos/vazios sempre vão para o final
+      if (aValue === null || aValue === '') return 1
+      if (bValue === null || bValue === '') return -1
+
+      // Comparação normal
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [transferencias, sortFieldTransferencia, sortDirection])
+
+  const handleSortLancamento = (field: SortFieldLancamento) => {
+    if (sortFieldLancamento === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortFieldLancamento(field)
+      setSortDirection('asc')
+    }
+    // Resetar ordenação de transferências quando ordenar lançamentos
+    setSortFieldTransferencia(null)
+  }
+
+  const handleSortTransferencia = (field: SortFieldTransferencia) => {
+    if (sortFieldTransferencia === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortFieldTransferencia(field)
+      setSortDirection('asc')
+    }
+    // Resetar ordenação de lançamentos quando ordenar transferências
+    setSortFieldLancamento(null)
+  }
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm(
@@ -183,24 +315,94 @@ export function FinanceiroTable({ lancamentos: initialLancamentos, transferencia
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Conta de Origem</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSortTransferencia('conta_origem')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Conta de Origem</span>
+                    {sortFieldTransferencia === 'conta_origem' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600"></th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Conta de Destino</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Data</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Descrição</th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Valor</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSortTransferencia('conta_destino')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Conta de Destino</span>
+                    {sortFieldTransferencia === 'conta_destino' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSortTransferencia('data')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Data</span>
+                    {sortFieldTransferencia === 'data' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSortTransferencia('descricao')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Descrição</span>
+                    {sortFieldTransferencia === 'descricao' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="text-right py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSortTransferencia('valor')}
+                >
+                  <div className="flex items-center justify-end gap-2">
+                    <span>Valor</span>
+                    {sortFieldTransferencia === 'valor' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
                 <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {transferencias.length === 0 ? (
+              {sortedTransferencias.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-8 text-gray-500">
                     Nenhuma transferência encontrada
                   </td>
                 </tr>
               ) : (
-                transferencias.map((transferencia) => (
+                sortedTransferencias.map((transferencia) => (
                   <tr key={transferencia.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-4">
                       <div className="text-sm font-medium text-gray-900">
@@ -256,12 +458,96 @@ export function FinanceiroTable({ lancamentos: initialLancamentos, transferencia
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Cliente</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Categoria</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Data</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Vencimento</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Status</th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Valor</th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSortLancamento('cliente')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Cliente</span>
+                    {sortFieldLancamento === 'cliente' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSortLancamento('categoria')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Categoria</span>
+                    {sortFieldLancamento === 'categoria' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSortLancamento('data')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Data</span>
+                    {sortFieldLancamento === 'data' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSortLancamento('vencimento')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Vencimento</span>
+                    {sortFieldLancamento === 'vencimento' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="text-left py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSortLancamento('status')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Status</span>
+                    {sortFieldLancamento === 'status' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="text-right py-3 px-4 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                  onClick={() => handleSortLancamento('valor')}
+                >
+                  <div className="flex items-center justify-end gap-2">
+                    <span>Valor</span>
+                    {sortFieldLancamento === 'valor' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUp className="w-4 h-4 text-primary-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-primary-600" />
+                      )
+                    )}
+                  </div>
+                </th>
                 <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Ações</th>
               </tr>
             </thead>

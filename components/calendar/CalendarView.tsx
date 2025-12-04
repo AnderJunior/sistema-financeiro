@@ -36,8 +36,9 @@ function DailyView({ date, events }: { date: Date; events: CalendarEvent[] }) {
           {hours.map((hour) => {
             const hourStart = addHours(startOfDay(date), hour)
             const hourEvents = dayEvents.filter((event) => {
+              // Evento deve aparecer apenas no slot de hora correspondente à sua hora exata
               const eventHour = event.date.getHours()
-              return eventHour === hour || (eventHour === hour - 1 && event.date.getMinutes() > 0)
+              return eventHour === hour
             })
 
             return (
@@ -52,6 +53,15 @@ function DailyView({ date, events }: { date: Date; events: CalendarEvent[] }) {
                       projeto: 'Projeto',
                       cobranca: 'Cobrança'
                     }
+                    
+                    // Determinar o título a ser exibido
+                    let displayTitle = event.title
+                    if (event.type === 'projeto' && 'clientes' in event.data && event.data.clientes) {
+                      displayTitle = event.data.clientes.nome
+                    } else if (event.type === 'cobranca' && 'clientes' in event.data && event.data.clientes) {
+                      displayTitle = event.data.clientes.nome
+                    }
+                    
                     return (
                       <div
                         key={`${event.type}-${event.id}-${event.date.getTime()}`}
@@ -63,7 +73,7 @@ function DailyView({ date, events }: { date: Date; events: CalendarEvent[] }) {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-gray-900">{event.title}</div>
+                            <div className="font-semibold text-gray-900">{displayTitle}</div>
                             <div className="text-xs text-gray-600 mt-1">
                               {format(event.date, 'HH:mm')}
                             </div>
@@ -139,8 +149,9 @@ function WeeklyView({ date, events }: { date: Date; events: CalendarEvent[] }) {
                 </div>
                 {weekDays.map((day) => {
                   const dayEvents = events.filter((event) => {
+                    // Evento deve aparecer apenas no slot de hora correspondente à sua hora exata
                     const eventHour = event.date.getHours()
-                    return isSameDay(event.date, day) && (eventHour === hour || (eventHour === hour - 1 && event.date.getMinutes() > 0))
+                    return isSameDay(event.date, day) && eventHour === hour
                   })
 
                   return (
@@ -154,6 +165,15 @@ function WeeklyView({ date, events }: { date: Date; events: CalendarEvent[] }) {
                           projeto: 'Projeto',
                           cobranca: 'Cobrança'
                         }
+                        
+                        // Determinar o título a ser exibido
+                        let displayTitle = event.title
+                        if (event.type === 'projeto' && 'clientes' in event.data && event.data.clientes) {
+                          displayTitle = event.data.clientes.nome
+                        } else if (event.type === 'cobranca' && 'clientes' in event.data && event.data.clientes) {
+                          displayTitle = event.data.clientes.nome
+                        }
+                        
                         return (
                           <div
                             key={`${event.type}-${event.id}-${event.date.getTime()}`}
@@ -162,9 +182,9 @@ function WeeklyView({ date, events }: { date: Date; events: CalendarEvent[] }) {
                               backgroundColor: `${event.color}25`,
                               borderLeft: `3px solid ${event.color}`,
                             }}
-                            title={`${event.title} - ${typeLabels[event.type]}`}
+                            title={`${displayTitle} - ${typeLabels[event.type]}`}
                           >
-                            <div className="font-medium text-gray-900 truncate">{event.title}</div>
+                            <div className="font-medium text-gray-900 truncate">{displayTitle}</div>
                             <div className="flex items-center gap-1 mt-0.5">
                               <span className="text-gray-600">{format(event.date, 'HH:mm')}</span>
                               <span
@@ -245,18 +265,27 @@ function MonthlyView({ date, events }: { date: Date; events: CalendarEvent[] }) 
                             projeto: 'P',
                             cobranca: 'C'
                           }
+                          
+                          // Determinar o título a ser exibido
+                          let displayTitle = event.title
+                          if (event.type === 'projeto' && 'clientes' in event.data && event.data.clientes) {
+                            displayTitle = event.data.clientes.nome
+                          } else if (event.type === 'cobranca' && 'clientes' in event.data && event.data.clientes) {
+                            displayTitle = event.data.clientes.nome
+                          }
+                          
                           return (
                             <div
                               key={`${event.type}-${event.id}-${event.date.getTime()}`}
-                              className="p-1.5 rounded text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                              className="p-1.5 rounded  cursor-pointer hover:opacity-80 transition-opacity"
                               style={{
                                 backgroundColor: `${event.color}25`,
                                 borderLeft: `3px solid ${event.color}`,
                               }}
-                              title={`${event.title} - ${event.type === 'tarefa' ? 'Tarefa' : event.type === 'projeto' ? 'Projeto' : 'Cobrança'}`}
+                              title={`${displayTitle} - ${event.type === 'tarefa' ? 'Tarefa' : event.type === 'projeto' ? 'Projeto' : 'Cobrança'}`}
                             >
                               <div className="flex items-center gap-1">
-                                <div className="font-medium text-gray-900 truncate flex-1">{event.title}</div>
+                                <div className="font-medium text-gray-900 truncate flex-1">{displayTitle}</div>
                                 <span
                                   className="px-1 rounded text-[10px] font-bold flex-shrink-0"
                                   style={{

@@ -20,11 +20,30 @@ export function TopBar() {
   const router = useRouter()
 
   useEffect(() => {
+    // Carregar contagem inicial
     loadNotificationsCount()
     
-    // Atualizar contagem a cada minuto
-    const interval = setInterval(loadNotificationsCount, 60000)
-    return () => clearInterval(interval)
+    // OTIMIZADO: Usar Realtime subscription em vez de polling
+    const supabase = createClient()
+    const channel = supabase
+      .channel('topbar_notifications_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notificacoes_log',
+        },
+        () => {
+          // Atualizar contagem quando houver mudanças
+          loadNotificationsCount()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   // Buscar clientes enquanto digita
