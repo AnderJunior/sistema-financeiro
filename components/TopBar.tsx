@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { Search, Bell, User, LogOut } from 'lucide-react'
 import { NotificationsDropdown } from './NotificationsDropdown'
 import { createClient } from '@/lib/supabase/client'
@@ -177,7 +178,7 @@ export function TopBar() {
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between gap-6 sticky top-0 z-50">
       {/* Barra de busca */}
-      <div className="flex-1 max-w-md relative" ref={searchRef}>
+      <div className="flex-1 max-w-md relative border border-gray-200 rounded-lg" ref={searchRef}>
         <div className="relative">
           <input
             type="search"

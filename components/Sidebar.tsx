@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { 
@@ -145,8 +146,16 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-slate-900 text-white flex flex-col">
       <div className="p-6 border-b border-slate-800">
-        <h1 className="text-xl font-bold">Sistema ERP</h1>
-        <p className="text-sm text-slate-400 mt-1">Financeiro</p>
+        <Link href="/dashboard" className="flex justify-center">
+          <Image
+            src="/logos/para-fundos-escuros-vertical.png"
+            alt="Logo do Sistema"
+            width={120}
+            height={40}
+            className="h-auto"
+            priority
+          />
+        </Link>
       </div>
       
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">

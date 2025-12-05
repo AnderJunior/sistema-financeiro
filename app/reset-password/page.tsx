@@ -3,6 +3,7 @@
 import React, { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/Input'
 
@@ -84,7 +85,18 @@ function ResetPasswordPageContent() {
       {/* Main container */}
       <div className="w-full max-w-6xl bg-white rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col md:flex-row">
         {/* Left Section - Welcome */}
-        <div className="w-full md:w-1/2 bg-gradient-to-br from-primary-800 to-primary-900 p-8 md:p-12 flex flex-col justify-center text-white relative">
+        <div className="w-full md:w-1/2 bg-gradient-to-br from-primary-800 to-primary-900 p-8 md:p-12 flex flex-col justify-between text-white relative">
+          {/* Logo */}
+          <div className="flex items-center">
+            <Image
+              src="/logos/para-fundos-escuros-horizontal.png"
+              alt="Logo do Sistema"
+              width={200}
+              height={60}
+              className="h-auto"
+              priority
+            />
+          </div>
           <div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
               Redefinir senha
@@ -98,6 +110,17 @@ function ResetPasswordPageContent() {
         {/* Right Section - Form */}
         <div className="w-full md:w-1/2 bg-white p-8 md:p-12 flex flex-col justify-center">
           <div className="w-full max-w-md mx-auto">
+            {/* Logo para fundo claro */}
+            <div className="mb-6 flex justify-center md:justify-start">
+              <Image
+                src="/logos/para-fundos-claros-horizontal.png"
+                alt="Logo do Sistema"
+                width={180}
+                height={54}
+                className="h-auto"
+                priority
+              />
+            </div>
             <div className="mb-8">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
                 Nova senha

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/Input'
 
@@ -69,14 +70,15 @@ export default function ForgotPasswordPage() {
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 text-white h-full">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-              <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold">SEU</span>
-              <span className="text-sm font-semibold">LOGO</span>
-            </div>
+          <div className="flex items-center">
+            <Image
+              src="/logos/totalmente-branca-horizontal.png"
+              alt="Logo do Sistema"
+              width={200}
+              height={60}
+              className="h-auto"
+              priority
+            />
           </div>
 
           {/* Main text */}
@@ -96,6 +98,17 @@ export default function ForgotPasswordPage() {
       {/* Right Section - Forgot Password Form */}
       <div className="w-full lg:w-1/3 bg-white flex flex-col justify-center p-8 md:p-12">
         <div className="w-full max-w-md mx-auto">
+          {/* Logo para fundo claro */}
+          <div className="mb-8 flex justify-center lg:justify-start">
+            <Image
+              src="/logos/para-fundos-claros-horizontal.png"
+              alt="Logo do Sistema"
+              width={180}
+              height={54}
+              className="h-auto"
+              priority
+            />
+          </div>
           {success ? (
             <div className="space-y-6">
               <div>
