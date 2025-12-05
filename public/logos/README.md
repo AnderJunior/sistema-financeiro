@@ -74,3 +74,4 @@ import Image from 'next/image'
 - Mantenha os arquivos organizados e com nomes descritivos
 - Use versões otimizadas para melhor performance
 
+

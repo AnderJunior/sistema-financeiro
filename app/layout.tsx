@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Sistema Financeiro ERP',
   description: 'Sistema completo de gestão financeira e clientes',
+  icons: {
+    icon: '/logos/favicon.png',
+  },
 }
 
 export default function RootLayout({
