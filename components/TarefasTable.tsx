@@ -2,7 +2,7 @@
 
 import { formatDate } from '@/lib/utils'
 import { Search, List, LayoutGrid, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { TarefaDetailModal } from '@/components/modals/TarefaDetailModal'
 import { TarefaKanbanColuna } from '@/types/kanban.types'
 import { useModal } from '@/contexts/ModalContext'
@@ -42,18 +42,21 @@ interface TarefasTableProps {
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
   kanbanColumns: TarefaKanbanColuna[]
+  initialTarefaId?: string | null
+  onInitialTarefaOpened?: () => void
 }
 
 type SortField = 'nome' | 'cliente' | 'data_vencimento' | 'status' | null
 type SortDirection = 'asc' | 'desc'
 
-export function TarefasTable({ tarefas, onTarefaUpdate, viewMode, onViewModeChange, kanbanColumns }: TarefasTableProps) {
+export function TarefasTable({ tarefas, onTarefaUpdate, viewMode, onViewModeChange, kanbanColumns, initialTarefaId, onInitialTarefaOpened }: TarefasTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTarefa, setSelectedTarefa] = useState<Tarefa | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [sortField, setSortField] = useState<SortField>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const { confirm, alert } = useModal()
+  const hasOpenedInitialTarefa = useRef(false)
 
   const columnMap = useMemo(() => {
     return new Map(kanbanColumns.map((coluna) => [coluna.id, coluna]))
@@ -139,6 +142,20 @@ export function TarefasTable({ tarefas, onTarefaUpdate, viewMode, onViewModeChan
     setSelectedTarefa(tarefa)
     setIsDetailModalOpen(true)
   }
+
+  // Abrir modal automaticamente quando houver uma tarefa inicial
+  useEffect(() => {
+    if (initialTarefaId && !hasOpenedInitialTarefa.current && tarefas.length > 0) {
+      const tarefa = tarefas.find(t => t.id === initialTarefaId)
+      if (tarefa) {
+        setSelectedTarefa(tarefa)
+        setIsDetailModalOpen(true)
+        hasOpenedInitialTarefa.current = true
+        // Limpar o initialTarefaId após abrir para evitar que reabra ao mudar visualização
+        onInitialTarefaOpened?.()
+      }
+    }
+  }, [initialTarefaId, tarefas, onInitialTarefaOpened])
 
   const handleDelete = async (e: React.MouseEvent, tarefaId: string, tarefaNome: string) => {
     e.stopPropagation() // Prevenir que o click abra o modal de detalhes

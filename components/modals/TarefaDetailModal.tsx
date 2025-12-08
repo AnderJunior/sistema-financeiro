@@ -322,7 +322,25 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
   }
 
   const handleDateChange = (date: Date | null, type: 'inicio' | 'vencimento') => {
-    const formattedDate = date ? date.toISOString().split('T')[0] : null
+    let formattedDate: string | null = null
+    if (date) {
+      // Usar valores locais para evitar problemas de timezone
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      
+      if (type === 'vencimento') {
+        // Para data_vencimento (TIMESTAMP WITH TIME ZONE), adicionar hora 12:00 no timezone local
+        // Isso evita problemas de conversão de timezone
+        // Criar uma nova data com hora 12:00 local usando valores numéricos
+        const dateWithTime = new Date(year, date.getMonth(), date.getDate(), 12, 0, 0)
+        // Converter para ISO string que será interpretada corretamente pelo PostgreSQL
+        formattedDate = dateWithTime.toISOString()
+      } else {
+        // Para data_inicio (DATE), usar apenas a data
+        formattedDate = `${year}-${month}-${day}`
+      }
+    }
     setTarefaData((prev) => ({
       ...prev,
       data_inicio: type === 'inicio' ? formattedDate : prev.data_inicio,
@@ -446,6 +464,63 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
     const hour = past.getHours().toString().padStart(2, '0')
     const minute = past.getMinutes().toString().padStart(2, '0')
     return `${day} ${month} às ${hour}:${minute}`
+  }
+
+  const renderTextWithLinks = (text: string) => {
+    // Regex para detectar URLs (http, https, www, ou protocolos comuns)
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*)/g
+    const parts: (string | { type: 'link'; url: string; text: string })[] = []
+    let lastIndex = 0
+    let match
+
+    while ((match = urlRegex.exec(text)) !== null) {
+      // Adicionar texto antes do link
+      if (match.index > lastIndex) {
+        parts.push(text.substring(lastIndex, match.index))
+      }
+
+      // Processar o link
+      let url = match[0]
+      let displayText = match[0]
+
+      // Adicionar https:// se começar com www
+      if (url.startsWith('www.')) {
+        url = 'https://' + url
+      }
+
+      parts.push({ type: 'link', url, text: displayText })
+      lastIndex = match.index + match[0].length
+    }
+
+    // Adicionar texto restante
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex))
+    }
+
+    // Se não encontrou nenhum link, retorna o texto original
+    if (parts.length === 0) {
+      return text
+    }
+
+    // Renderizar os elementos
+    return parts.map((part, index) => {
+      if (typeof part === 'string') {
+        return <span key={index}>{part}</span>
+      } else {
+        return (
+          <a
+            key={index}
+            href={part.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary-600 hover:text-primary-700 underline break-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part.text}
+          </a>
+        )
+      }
+    })
   }
 
   const getDaysInMonth = (date: Date) => {
@@ -620,6 +695,16 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
     }
   }, [isOpen, handleModalClose])
 
+  // Função auxiliar para normalizar data_vencimento (TIMESTAMP) para exibição
+  const normalizeVencimentoDate = (dateStr: string | null): string | null => {
+    if (!dateStr) return null
+    // Se for TIMESTAMP (contém 'T'), extrair apenas a data
+    if (dateStr.includes('T')) {
+      return dateStr.split('T')[0]
+    }
+    return dateStr
+  }
+
   if (!isOpen) return null
 
   // Preparar dados para renderização
@@ -738,27 +823,57 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
                 <div className="flex items-center gap-3 relative" ref={calendarRef}>
                   <label className="text-sm font-medium text-black w-[50px]">Datas</label>
                   <div className="flex-1 flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        setShowCalendar(!showCalendar)
-                        setCalendarType('inicio')
-                      }}
-                      className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
-                    >
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <span>{tarefaData.data_inicio ? formatDate(tarefaData.data_inicio) : 'Data inicial'}</span>
-                    </button>
-                    <span className="text-gray-400">→</span>
-                    <button
-                      onClick={() => {
-                        setShowCalendar(!showCalendar)
-                        setCalendarType('vencimento')
-                      }}
-                      className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
-                    >
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <span>{tarefaData.data_vencimento ? formatDate(tarefaData.data_vencimento) : 'Data de vencimento'}</span>
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setShowCalendar(!showCalendar)
+                          setCalendarType('inicio')
+                        }}
+                        className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 whitespace-nowrap"
+                      >
+                        <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span>{tarefaData.data_inicio ? formatDate(tarefaData.data_inicio) : 'Data inicial'}</span>
+                      </button>
+                      {tarefaData.data_inicio && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDateChange(null, 'inicio')
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 flex-shrink-0"
+                          title="Limpar data inicial"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <span className="text-gray-400 flex-shrink-0">→</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setShowCalendar(!showCalendar)
+                          setCalendarType('vencimento')
+                        }}
+                        className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 whitespace-nowrap"
+                      >
+                        <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span>{tarefaData.data_vencimento ? formatDate(tarefaData.data_vencimento) : 'Data de vencimento'}</span>
+                      </button>
+                      {tarefaData.data_vencimento && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDateChange(null, 'vencimento')
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 flex-shrink-0"
+                          title="Limpar data de vencimento"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {showCalendar && calendarType && (
@@ -812,10 +927,15 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
                             <div className="flex items-center gap-2 text-xs text-gray-500">
                               <button
                                 type="button"
-                                onClick={() => setCurrentMonth(new Date())}
-                                className="text-primary-600 font-semibold hover:text-primary-700"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  handleDateChange(null, calendarType)
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
+                                title="Limpar data"
                               >
-                                Hoje
+                                <Trash2 className="w-4 h-4" />
                               </button>
                               <div className="flex flex-col gap-0.5">
                                 <button
@@ -850,9 +970,18 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
                               const day = i + 1
                               const date = new Date(year, currentMonthIndex, day)
                               const isToday = date.toDateString() === new Date().toDateString()
+                              // Formatar data usando valores locais para comparação
+                              const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                              
+                              // Para data_vencimento (TIMESTAMP), extrair apenas a data para comparação
+                              let vencimentoDateStr = tarefaData.data_vencimento
+                              if (vencimentoDateStr && vencimentoDateStr.includes('T')) {
+                                vencimentoDateStr = vencimentoDateStr.split('T')[0]
+                              }
+                              
                               const isSelected = calendarType === 'inicio' 
-                                ? tarefaData.data_inicio === date.toISOString().split('T')[0]
-                                : tarefaData.data_vencimento === date.toISOString().split('T')[0]
+                                ? tarefaData.data_inicio === dateStr
+                                : vencimentoDateStr === dateStr
                               
                               return (
                                 <button
@@ -1109,7 +1238,7 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
                           <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
                             A
                           </div>
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-gray-900">Anderson Andrade</span>
@@ -1131,7 +1260,7 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
                                 </button>
                               )}
                             </div>
-                            <div className="text-sm text-gray-700">{comentario.comentario}</div>
+                            <div className="text-sm text-gray-700 break-words">{renderTextWithLinks(comentario.comentario)}</div>
                           </div>
                         </div>
                       </div>

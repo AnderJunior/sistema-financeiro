@@ -32,9 +32,10 @@ interface ProjetosKanbanProps {
   projetos: Lancamento[]
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
+  onProjetosChange?: (projetos: Lancamento[]) => void
 }
 
-export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewModeChange }: ProjetosKanbanProps) {
+export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewModeChange, onProjetosChange }: ProjetosKanbanProps) {
   const router = useRouter()
   const { alert, confirm } = useModal()
   const [projetos, setProjetos] = useState(initialProjetos)
@@ -165,39 +166,53 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
     loadColunas()
   }, [])
 
-  // Subscription realtime para atualizar projetos quando status_servico mudar
+  // OTIMIZADO: Subscription realtime com debounce e atualização incremental
   useEffect(() => {
     const supabase = createClient()
+    let debounceTimer: NodeJS.Timeout | null = null
+    
     const channel = supabase
       .channel('projetos_kanban_status_changes')
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: 'UPDATE', // OTIMIZADO: Apenas UPDATE, não todos os eventos
           schema: 'public',
           table: 'financeiro_lancamentos',
           filter: 'servico_id=not.is.null',
         },
         (payload) => {
-          // Quando status_servico mudar, atualizar o projeto correspondente imediatamente
-          const updatedLancamento = payload.new as any
-          const oldLancamento = payload.old as any
-          
-          // Verificar se o status_servico realmente mudou
-          if (updatedLancamento.status_servico !== oldLancamento?.status_servico) {
-            if (updatedLancamento.id) {
-              // Atualizar estado imediatamente usando o payload
-              // Preservar dados financeiros existentes ao atualizar apenas o status
-              setProjetos(prevProjetos => {
-                // Atualizar apenas o lançamento específico pelo ID
-                return prevProjetos.map(p =>
-                  p.id === updatedLancamento.id
-                    ? { ...p, status_servico: updatedLancamento.status_servico }
-                    : p
-                )
-              })
-            }
+          // Debounce para evitar múltiplas atualizações rápidas
+          if (debounceTimer) {
+            clearTimeout(debounceTimer)
           }
+          
+          debounceTimer = setTimeout(() => {
+            const updatedLancamento = payload.new as any
+            const oldLancamento = payload.old as any
+            
+            // Verificar se o status_servico realmente mudou
+            if (updatedLancamento.status_servico !== oldLancamento?.status_servico) {
+              if (updatedLancamento.id) {
+                // Atualização incremental - apenas o registro específico
+                // Preservar dados financeiros existentes ao atualizar apenas o status
+                setProjetos(prevProjetos => {
+                  const updated = prevProjetos.map(p =>
+                    p.id === updatedLancamento.id
+                      ? { ...p, status_servico: updatedLancamento.status_servico }
+                      : p
+                  )
+                  
+                  // Notificar componente pai se necessário
+                  if (onProjetosChange) {
+                    onProjetosChange(updated)
+                  }
+                  
+                  return updated
+                })
+              }
+            }
+          }, 100) // Debounce de 100ms
         }
       )
       .subscribe()
@@ -206,23 +221,32 @@ export function ProjetosKanban({ projetos: initialProjetos, viewMode, onViewMode
     const handleCustomEvent = (e: CustomEvent) => {
       const { lancamentoId, newStatus } = e.detail
       if (lancamentoId) {
-        setProjetos(prevProjetos => 
-          prevProjetos.map(p => 
+        setProjetos(prevProjetos => {
+          const updated = prevProjetos.map(p => 
             p.id === lancamentoId
               ? { ...p, status_servico: newStatus }
               : p
           )
-        )
+          
+          if (onProjetosChange) {
+            onProjetosChange(updated)
+          }
+          
+          return updated
+        })
       }
     }
 
     window.addEventListener('projetoStatusChanged', handleCustomEvent as EventListener)
 
     return () => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+      }
       supabase.removeChannel(channel)
       window.removeEventListener('projetoStatusChanged', handleCustomEvent as EventListener)
     }
-  }, [])
+  }, [onProjetosChange])
 
   const checkScrollability = () => {
     if (scrollContainerRef.current) {

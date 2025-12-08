@@ -87,34 +87,31 @@ export default function ProjetosPage() {
     loadProjetos()
     loadClientes()
 
-    // Configurar subscription Realtime
-    const supabase = createClient()
-    const channel = supabase
-      .channel('projetos_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'financeiro_lancamentos',
-          filter: 'servico_id=not.is.null'
-        },
-        async () => {
-          await loadProjetos()
-        }
-      )
-      .subscribe()
-
+    // OTIMIZADO: Removida subscription duplicada da página principal
+    // Os componentes filhos (Table/Kanban) já têm suas próprias subscriptions otimizadas
+    // Usar apenas eventos customizados para recarregar quando necessário
+    
     // Listener para eventos customizados (quando componentes filhos atualizam)
+    // Adicionar debounce para evitar múltiplas recargas rápidas
+    let debounceTimer: NodeJS.Timeout | null = null
     const handleCustomEvent = async () => {
-      await loadProjetos()
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+      }
+      debounceTimer = setTimeout(async () => {
+        await loadProjetos()
+      }, 300) // Debounce de 300ms
     }
 
     window.addEventListener('projetoStatusChanged', handleCustomEvent)
+    window.addEventListener('projetoNeedsReload', handleCustomEvent)
 
     return () => {
-      supabase.removeChannel(channel)
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+      }
       window.removeEventListener('projetoStatusChanged', handleCustomEvent)
+      window.removeEventListener('projetoNeedsReload', handleCustomEvent)
     }
   }, [])
 
@@ -220,12 +217,14 @@ export default function ProjetosPage() {
             projetos={projetosFiltrados} 
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            onProjetosChange={setProjetos}
           />
         ) : (
           <ProjetosKanban 
             projetos={projetosFiltrados}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            onProjetosChange={setProjetos}
           />
         )}
       </Card>

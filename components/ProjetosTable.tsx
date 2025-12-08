@@ -28,6 +28,7 @@ interface ProjetosTableProps {
   projetos: Lancamento[]
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
+  onProjetosChange?: (projetos: Lancamento[]) => void
 }
 
 type ColumnKey = 'servico' | 'cliente' | 'valor' | 'data_vencimento' | 'status_servico'
@@ -50,7 +51,7 @@ const availableColumns: ColumnConfig[] = [
   { key: 'status_servico', label: 'Status', defaultVisible: true },
 ]
 
-export function ProjetosTable({ projetos: initialProjetos, viewMode, onViewModeChange }: ProjetosTableProps) {
+export function ProjetosTable({ projetos: initialProjetos, viewMode, onViewModeChange, onProjetosChange }: ProjetosTableProps) {
   const router = useRouter()
   const [projetos, setProjetos] = useState(initialProjetos)
   const [searchTerm, setSearchTerm] = useState('')
@@ -93,40 +94,53 @@ export function ProjetosTable({ projetos: initialProjetos, viewMode, onViewModeC
     loadColunasKanban()
   }, [])
 
-  // Subscription realtime para atualizar projetos quando status_servico mudar
+  // OTIMIZADO: Subscription realtime com debounce e atualização incremental
   useEffect(() => {
     const supabase = createClient()
+    let debounceTimer: NodeJS.Timeout | null = null
+    
     const channel = supabase
       .channel('projetos_table_status_changes')
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: 'UPDATE', // OTIMIZADO: Apenas UPDATE, não todos os eventos
           schema: 'public',
           table: 'financeiro_lancamentos',
           filter: 'servico_id=not.is.null',
         },
         (payload) => {
-          // Quando status_servico mudar, atualizar o projeto correspondente imediatamente
-          const updatedLancamento = payload.new as any
-          const oldLancamento = payload.old as any
-          
-          // Verificar se o status_servico realmente mudou
-          if (updatedLancamento.status_servico !== oldLancamento?.status_servico) {
-            if (updatedLancamento.servico_id && updatedLancamento.cliente_id) {
-              // Atualizar estado imediatamente usando o payload
-              // Sempre atualizar quando o status mudar, mesmo que já esteja atualizado localmente
-              setProjetos(prevProjetos => {
-                // Atualizar todos os projetos com o mesmo servico_id e cliente_id
-                return prevProjetos.map(p =>
-                  (p.servico_id === updatedLancamento.servico_id && 
-                   p.cliente_id === updatedLancamento.cliente_id)
-                    ? { ...p, status_servico: updatedLancamento.status_servico }
-                    : p
-                )
-              })
-            }
+          // Debounce para evitar múltiplas atualizações rápidas
+          if (debounceTimer) {
+            clearTimeout(debounceTimer)
           }
+          
+          debounceTimer = setTimeout(() => {
+            const updatedLancamento = payload.new as any
+            const oldLancamento = payload.old as any
+            
+            // Verificar se o status_servico realmente mudou
+            if (updatedLancamento.status_servico !== oldLancamento?.status_servico) {
+              if (updatedLancamento.servico_id && updatedLancamento.cliente_id) {
+                // Atualização incremental - apenas o registro específico
+                setProjetos(prevProjetos => {
+                  const updated = prevProjetos.map(p =>
+                    (p.servico_id === updatedLancamento.servico_id && 
+                     p.cliente_id === updatedLancamento.cliente_id)
+                      ? { ...p, status_servico: updatedLancamento.status_servico }
+                      : p
+                  )
+                  
+                  // Notificar componente pai se necessário
+                  if (onProjetosChange) {
+                    onProjetosChange(updated)
+                  }
+                  
+                  return updated
+                })
+              }
+            }
+          }, 100) // Debounce de 100ms
         }
       )
       .subscribe()
@@ -134,22 +148,31 @@ export function ProjetosTable({ projetos: initialProjetos, viewMode, onViewModeC
     // Listener para eventos customizados de outros componentes
     const handleCustomEvent = (e: CustomEvent) => {
       const { servicoId, clienteId, newStatus } = e.detail
-      setProjetos(prevProjetos => 
-        prevProjetos.map(p => 
+      setProjetos(prevProjetos => {
+        const updated = prevProjetos.map(p => 
           (p.servico_id === servicoId && p.cliente_id === clienteId)
             ? { ...p, status_servico: newStatus }
             : p
         )
-      )
+        
+        if (onProjetosChange) {
+          onProjetosChange(updated)
+        }
+        
+        return updated
+      })
     }
 
     window.addEventListener('projetoStatusChanged', handleCustomEvent as EventListener)
 
     return () => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+      }
       supabase.removeChannel(channel)
       window.removeEventListener('projetoStatusChanged', handleCustomEvent as EventListener)
     }
-  }, [])
+  }, [onProjetosChange])
 
   async function loadColunasKanban() {
     const supabase = createClient()

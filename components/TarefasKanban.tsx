@@ -36,6 +36,8 @@ interface TarefasKanbanProps {
   onTarefaUpdate?: () => void
   kanbanColumns: TarefaKanbanColuna[]
   onColumnsUpdated: () => void
+  initialTarefaId?: string | null
+  onInitialTarefaOpened?: () => void
 }
 
 export function TarefasKanban({
@@ -45,6 +47,8 @@ export function TarefasKanban({
   onTarefaUpdate,
   kanbanColumns,
   onColumnsUpdated,
+  initialTarefaId,
+  onInitialTarefaOpened,
 }: TarefasKanbanProps) {
   const { alert } = useModal()
   const [localTarefas, setLocalTarefas] = useState(initialTarefas)
@@ -57,6 +61,7 @@ export function TarefasKanban({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
+  const hasOpenedInitialTarefa = useRef(false)
 
   useEffect(() => {
     setLocalTarefas(initialTarefas)
@@ -81,6 +86,19 @@ export function TarefasKanban({
       )
     })
   }, [localTarefas, searchTerm])
+
+  // Abrir modal automaticamente quando houver uma tarefa inicial
+  useEffect(() => {
+    if (initialTarefaId && !hasOpenedInitialTarefa.current && filteredTarefas.length > 0) {
+      const tarefa = filteredTarefas.find(t => t.id === initialTarefaId)
+      if (tarefa) {
+        setSelectedTarefa(tarefa)
+        hasOpenedInitialTarefa.current = true
+        // Limpar o initialTarefaId após abrir para evitar que reabra ao mudar visualização
+        onInitialTarefaOpened?.()
+      }
+    }
+  }, [initialTarefaId, filteredTarefas, onInitialTarefaOpened])
 
   const tarefasPorColuna = useMemo(() => {
     const grouped: Record<string, Tarefa[]> = {}

@@ -75,3 +75,4 @@ import Image from 'next/image'
 - Use versões otimizadas para melhor performance
 
 
+

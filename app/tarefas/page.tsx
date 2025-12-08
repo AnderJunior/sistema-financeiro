@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { TarefaKanbanColuna } from '@/types/kanban.types'
 import { Database } from '@/types/database.types'
 import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 // Tipagem local para Tarefa (evita problemas com tipos do Database)
 type Tarefa = {
@@ -36,9 +37,12 @@ const STORAGE_VIEW_KEY = 'tarefas_view_mode'
 export default function TarefasPage() {
   // Verificar assinatura ativa (bloqueia acesso se não tiver)
   const { loading: loadingAssinatura } = useAssinaturaAtiva()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [initialTarefaId, setInitialTarefaId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window !== 'undefined') {
       const saved = window.localStorage.getItem(STORAGE_VIEW_KEY)
@@ -144,6 +148,18 @@ export default function TarefasPage() {
     }
   }, [viewMode])
 
+  // Verificar query parameter para tarefa inicial
+  useEffect(() => {
+    const tarefaId = searchParams.get('tarefa')
+    if (tarefaId) {
+      setInitialTarefaId(tarefaId)
+      // Remover o parâmetro da URL após ler
+      const url = new URL(window.location.href)
+      url.searchParams.delete('tarefa')
+      router.replace(url.pathname + url.search, { scroll: false })
+    }
+  }, [searchParams, router])
+
   if (loading) {
     return (
       <div className="p-8">
@@ -184,6 +200,8 @@ export default function TarefasPage() {
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             kanbanColumns={kanbanColumns}
+            initialTarefaId={initialTarefaId}
+            onInitialTarefaOpened={() => setInitialTarefaId(null)}
           />
         ) : (
           <TarefasKanban
@@ -193,6 +211,8 @@ export default function TarefasPage() {
             onTarefaUpdate={loadTarefas}
             kanbanColumns={kanbanColumns}
             onColumnsUpdated={loadKanbanColumns}
+            initialTarefaId={initialTarefaId}
+            onInitialTarefaOpened={() => setInitialTarefaId(null)}
           />
         )}
       </Card>

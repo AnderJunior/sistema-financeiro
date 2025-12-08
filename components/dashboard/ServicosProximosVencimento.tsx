@@ -8,7 +8,6 @@ import { Database } from '@/types/database.types'
 import { Calendar, Package, Receipt, CheckSquare } from 'lucide-react'
 import { differenceInDays } from 'date-fns'
 import { useRouter } from 'next/navigation'
-import { useModal } from '@/contexts/ModalContext'
 
 type Lancamento = Database['public']['Tables']['financeiro_lancamentos']['Row'] & {
   servicos?: Database['public']['Tables']['servicos']['Row']
@@ -25,7 +24,6 @@ type TabType = 'servicos' | 'faturas' | 'tarefas'
 
 export function ServicosProximosVencimento() {
   const router = useRouter()
-  const { alert } = useModal()
   const [activeTab, setActiveTab] = useState<TabType>('servicos')
   const [servicos, setServicos] = useState<Lancamento[]>([])
   const [faturas, setFaturas] = useState<Lancamento[]>([])
@@ -144,9 +142,15 @@ export function ServicosProximosVencimento() {
       
       if (!colunas) return
       
-      // Identificar IDs das colunas concluídas e canceladas
-      const colunasConcluidasIds = colunas
-        .filter(col => col.nome.toLowerCase().includes('concluíd') || col.nome.toLowerCase().includes('cancelad'))
+      // Identificar IDs das colunas concluídas, finalizadas e canceladas
+      const colunasFinalizadasIds = colunas
+        .filter(col => {
+          const nomeLower = col.nome.toLowerCase()
+          return nomeLower.includes('concluíd') || 
+                 nomeLower.includes('cancelad') || 
+                 nomeLower.includes('finalizado') ||
+                 nomeLower.includes('finalizada')
+        })
         .map(col => col.id)
       
       // Buscar todas as tarefas
@@ -161,10 +165,10 @@ export function ServicosProximosVencimento() {
         .limit(100)
 
       if (data) {
-        // Filtrar tarefas pendentes (não concluídas/canceladas) e que não têm data de vencimento ou que não venceram nos próximos 10 dias
+        // Filtrar tarefas pendentes (não finalizadas/canceladas) e que não têm data de vencimento ou que não venceram nos próximos 10 dias
         const tarefasFiltradas = data.filter((tarefa) => {
-          // Excluir tarefas concluídas ou canceladas
-          if (colunasConcluidasIds.includes(tarefa.status)) return false
+          // Excluir tarefas finalizadas, concluídas ou canceladas
+          if (colunasFinalizadasIds.includes(tarefa.status)) return false
           
           // Se não tem data de vencimento, incluir (tarefas pendentes sem prazo)
           if (!tarefa.data_vencimento) return true
@@ -253,27 +257,15 @@ export function ServicosProximosVencimento() {
     }
   }
 
-  const handleFaturaClick = async (fatura: Lancamento) => {
+  const handleFaturaClick = (fatura: Lancamento) => {
     if (!fatura.cliente_id) return
 
-    // Copiar link de pagamento se existir
-    if (fatura.invoice_url) {
-      try {
-        await navigator.clipboard.writeText(fatura.invoice_url)
-        await alert('Link de pagamento copiado para a área de transferência!', 'Link copiado')
-      } catch (err) {
-        await alert('Erro ao copiar link. Tente novamente.', 'Erro')
-      }
-    } else {
-      await alert('Esta fatura não possui link de pagamento disponível.', 'Aviso')
-    }
-
-    // Navegar para a página do cliente com hash para scroll automático
+    // Navegar diretamente para a página do cliente com hash para scroll automático
     router.push(`/clientes/${fatura.cliente_id}#cobrancas`)
   }
 
   const handleTarefaClick = (tarefa: Tarefa) => {
-    router.push(`/tarefas`)
+    router.push(`/tarefas?tarefa=${tarefa.id}`)
   }
 
   const renderServicos = () => {
