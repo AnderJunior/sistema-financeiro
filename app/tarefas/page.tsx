@@ -6,7 +6,7 @@ import { Plus } from 'lucide-react'
 import { TarefasKanban } from '@/components/TarefasKanban'
 import { TarefasTable } from '@/components/TarefasTable'
 import { TarefaModal } from '@/components/modals/TarefaModal'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { TarefaKanbanColuna } from '@/types/kanban.types'
 import { Database } from '@/types/database.types'
@@ -34,7 +34,8 @@ type ViewMode = 'lista' | 'kanban'
 
 const STORAGE_VIEW_KEY = 'tarefas_view_mode'
 
-export default function TarefasPage() {
+// Componente interno que usa useSearchParams
+function TarefasPageContent() {
   // Verificar assinatura ativa (bloqueia acesso se não tiver)
   const { loading: loadingAssinatura } = useAssinaturaAtiva()
   const searchParams = useSearchParams()
@@ -227,6 +228,27 @@ export default function TarefasPage() {
         kanbanColumns={kanbanColumns}
       />
     </div>
+  )
+}
+
+// Componente principal com Suspense boundary
+export default function TarefasPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-8">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Tarefas</h1>
+            <p className="text-gray-600 mt-2">Gerencie todas as suas tarefas</p>
+          </div>
+        </div>
+        <Card>
+          <Loading isLoading={true} message="Carregando tarefas..." />
+        </Card>
+      </div>
+    }>
+      <TarefasPageContent />
+    </Suspense>
   )
 }
 
