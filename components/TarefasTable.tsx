@@ -55,6 +55,7 @@ export function TarefasTable({ tarefas, onTarefaUpdate, viewMode, onViewModeChan
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [sortField, setSortField] = useState<SortField>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
   const { confirm, alert } = useModal()
   const hasOpenedInitialTarefa = useRef(false)
 
@@ -136,6 +137,39 @@ export function TarefasTable({ tarefas, onTarefaUpdate, viewMode, onViewModeChan
             borderColor: 'transparent',
           },
     }
+  }
+
+  const getStatusStyle = (columnId: string | null) => {
+    const column = columnId ? columnMap.get(columnId) : undefined
+    return column
+      ? {
+          color: column.cor,
+          borderColor: column.cor,
+          backgroundColor: `${column.cor}1a`,
+        }
+      : {
+          color: '#374151',
+          borderColor: 'transparent',
+          backgroundColor: '#f5f5f5',
+        }
+  }
+
+  const handleStatusChange = async (tarefaId: string, colunaId: string) => {
+    setUpdatingStatusId(tarefaId)
+    const supabase = createClient()
+    
+    const { error } = await supabase
+      .from('tarefas')
+      .update({ status: colunaId })
+      .eq('id', tarefaId)
+
+    if (error) {
+      await alert('Erro ao atualizar status: ' + error.message, 'Erro')
+    } else {
+      onTarefaUpdate?.()
+    }
+    
+    setUpdatingStatusId(null)
   }
 
   const handleTarefaClick = (tarefa: Tarefa) => {
@@ -327,13 +361,35 @@ export function TarefasTable({ tarefas, onTarefaUpdate, viewMode, onViewModeChan
                     <td className="py-3 px-4 text-sm text-gray-600">
                       {tarefa.data_vencimento ? formatDate(tarefa.data_vencimento) : '-'}
                     </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className="text-xs font-medium rounded-full px-3 py-1 border"
-                        style={statusBadge.style}
-                      >
-                        {statusBadge.label}
-                      </span>
+                    <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                      {kanbanColumns.length > 0 ? (
+                        <select
+                          value={tarefa.status || kanbanColumns[0]?.id || ''}
+                          onChange={(e) => handleStatusChange(tarefa.id, e.target.value)}
+                          disabled={updatingStatusId === tarefa.id}
+                          className={`text-xs font-medium rounded-full px-3 py-1 border-0 cursor-pointer focus:ring-2 focus:ring-primary-500 focus:outline-none appearance-none ${updatingStatusId === tarefa.id ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'} transition-opacity`}
+                          style={{
+                            backgroundImage: updatingStatusId !== tarefa.id ? `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23374151' d='M6 9L1 4h10z'/%3E%3C/svg%3E")` : 'none',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 0.5rem center',
+                            paddingRight: updatingStatusId !== tarefa.id ? '2rem' : '0.75rem',
+                            ...getStatusStyle(tarefa.status || kanbanColumns[0]?.id),
+                          }}
+                        >
+                          {kanbanColumns.map((coluna) => (
+                            <option key={coluna.id} value={coluna.id}>
+                              {coluna.nome}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span
+                          className="text-xs font-medium rounded-full px-3 py-1 border"
+                          style={statusBadge.style}
+                        >
+                          {statusBadge.label}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <button

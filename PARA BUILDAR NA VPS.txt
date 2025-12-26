@@ -1,0 +1,38 @@
+# PARA FAZER COMMIT EM GIT HUB
+
+git add .
+git commit -m "Adição de Cores e Logotipos"
+git push origin main
+
+
+|----------------------------------------------------------------|
+
+# ATUALIZAR O CODIGO NA VPS
+
+cd /opt/sistema-financeiro
+
+# Puxar as alterações da branch main
+git pull origin main
+
+|----------------------------------------------------------------|
+# PARA BUILDAR NA VPS
+
+# Carregar suas variáveis do .env (se quiser)
+set -a
+source .env
+set +a
+
+docker build \
+  --progress=plain \
+  --build-arg NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
+  --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  -t sistema-financeiro:latest .
+
+
+|----------------------------------------------------------------|
+
+# PARA ATUALIZAR O DOCKER SWARN
+
+docker service update \
+  --image sistema-financeiro:latest \
+  sistema-financeiro_sistema-financeiro

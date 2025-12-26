@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, MessageSquare, Send, Calendar, User, FolderTree, FileText, Link2, ThumbsUp, Smile, ChevronDown, ChevronUp, Flag, Search as SearchIcon, Trash2 } from 'lucide-react'
+import { X, MessageSquare, Send, Calendar, User, FolderTree, FileText, Link2, ThumbsUp, Smile, ChevronDown, ChevronUp, Flag, Search as SearchIcon, Trash2, Pencil } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate } from '@/lib/utils'
 import { useModal } from '@/contexts/ModalContext'
@@ -83,6 +83,7 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
   } | null>(null)
   
   // Estados para edição
+  const [editingNome, setEditingNome] = useState(false)
   const [editingStatus, setEditingStatus] = useState(false)
   const [editingCliente, setEditingCliente] = useState(false)
   const [editingPrioridade, setEditingPrioridade] = useState(false)
@@ -247,6 +248,7 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
       setOriginalTarefa(tarefa)
       setDraftHasChanges(false)
       setPendingStatusChange(null)
+      setEditingNome(false)
       loadAtividades()
       loadClientes()
       
@@ -583,6 +585,9 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
     if (tarefaData.descricao !== originalTarefa.descricao) {
       updateData.descricao = tarefaData.descricao
     }
+    if (tarefaData.nome !== originalTarefa.nome) {
+      updateData.nome = tarefaData.nome
+    }
 
     let saved = true
     try {
@@ -766,7 +771,42 @@ export function TarefaDetailModal({ isOpen, onClose, tarefa, onUpdate, kanbanCol
         <div className="flex-1 overflow-hidden flex">
           {/* Left Panel - Detalhes */}
           <div className="flex-1 overflow-y-auto p-6 border-r border-gray-200">
-            <h1 className="text-3xl font-bold text-gray-900 mb-6">{tarefaData.nome}</h1>
+            <div className="flex items-center gap-2 mb-6">
+              {editingNome ? (
+                <input
+                  type="text"
+                  value={tarefaData.nome}
+                  onChange={(e) => {
+                    setTarefaData((prev) => ({ ...prev, nome: e.target.value }))
+                    setDraftHasChanges(true)
+                  }}
+                  onBlur={() => setEditingNome(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur()
+                    } else if (e.key === 'Escape') {
+                      setTarefaData((prev) => ({ ...prev, nome: originalTarefa.nome }))
+                      setDraftHasChanges(false)
+                      setEditingNome(false)
+                    }
+                  }}
+                  className="text-3xl font-bold text-gray-900 flex-1 border-2 border-primary-500 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  autoFocus
+                />
+              ) : (
+                <>
+                  <h1 className="text-3xl font-bold text-gray-900">{tarefaData.nome}</h1>
+                  <button
+                    onClick={() => setEditingNome(true)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
+                    aria-label="Editar nome da tarefa"
+                    title="Editar nome da tarefa"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
 
             {/* Campos Editáveis - Duas Colunas */}
             <div className="grid grid-cols-[minmax(260px,320px)_minmax(220px,1fr)] gap-20 mb-4 items-start">

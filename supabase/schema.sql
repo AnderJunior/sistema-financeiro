@@ -234,6 +234,50 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_projeto_status_trigger BEFORE UPDATE ON projetos
   FOR EACH ROW EXECUTE FUNCTION update_projeto_status_on_progress();
 
+-- Função para atualizar status de cobranças atrasadas automaticamente
+CREATE OR REPLACE FUNCTION update_cobranca_status_on_vencimento()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Verificar se é uma cobrança (tipo = 'entrada')
+  -- e se a data de vencimento é menor que a data atual
+  IF NEW.tipo = 'entrada' 
+     AND NEW.data_vencimento IS NOT NULL 
+     AND NEW.data_vencimento < CURRENT_DATE 
+     AND NEW.status NOT IN ('pago', 'cancelado') THEN
+    NEW.status = 'em_atraso';
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Trigger para atualizar status de cobranças atrasadas
+CREATE TRIGGER trigger_update_cobranca_status_on_vencimento
+  BEFORE INSERT OR UPDATE ON financeiro_lancamentos
+  FOR EACH ROW
+  EXECUTE FUNCTION update_cobranca_status_on_vencimento();
+
+-- Função para atualizar cobranças existentes que estão atrasadas
+CREATE OR REPLACE FUNCTION atualizar_cobrancas_atrasadas()
+RETURNS INTEGER AS $$
+DECLARE
+  registros_atualizados INTEGER;
+BEGIN
+  -- Atualizar cobranças que estão atrasadas mas não estão marcadas como atrasadas
+  UPDATE financeiro_lancamentos
+  SET status = 'em_atraso',
+      updated_at = NOW()
+  WHERE tipo = 'entrada'
+    AND data_vencimento IS NOT NULL
+    AND data_vencimento < CURRENT_DATE
+    AND status NOT IN ('pago', 'cancelado', 'em_atraso');
+  
+  GET DIAGNOSTICS registros_atualizados = ROW_COUNT;
+  
+  RETURN registros_atualizados;
+END;
+$$ language 'plpgsql';
+
 -- Inserir categorias padrão
 INSERT INTO financeiro_categorias (tipo, nome, descricao) VALUES
   ('entrada', 'Venda de Serviços', 'Receitas provenientes de vendas de serviços'),

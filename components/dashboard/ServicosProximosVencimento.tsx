@@ -55,8 +55,16 @@ export function ServicosProximosVencimento() {
 
       if (data) {
         // Filtrar apenas os próximos do vencimento e vencidos (até 10 dias à frente)
+        // E excluir serviços de clientes finalizados (status = 'finalizado')
         const servicosFiltrados = data.filter((servico) => {
           if (!servico.data_vencimento) return false
+          
+          // Excluir serviços de clientes finalizados
+          // Se o cliente está na coluna "Finalizado" no kanban, não mostrar o serviço
+          if (servico.clientes && servico.clientes.status === 'finalizado') {
+            return false
+          }
+          
           const dataVencimento = new Date(servico.data_vencimento)
           dataVencimento.setHours(0, 0, 0, 0)
           const diasDiferenca = differenceInDays(dataVencimento, hoje)

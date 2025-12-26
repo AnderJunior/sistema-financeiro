@@ -27,8 +27,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Verificar sessão inicial
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        setUser(session?.user ?? null)
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        // Se houver erro ao obter sessão, pode ser problema com metadados corrompidos
+        if (error) {
+          console.error('Erro ao verificar sessão:', error)
+          // Tentar limpar metadados problemáticos se possível
+          try {
+            const { data: { user: currentUser } } = await supabase.auth.getUser()
+            if (currentUser?.user_metadata?.foto_url) {
+              // Metadados podem estar corrompidos - tentar limpar
+              console.warn('Detectados metadados de foto que podem estar causando problema')
+            }
+          } catch (cleanupError) {
+            console.error('Erro ao tentar limpar metadados:', cleanupError)
+          }
+        }
+        
+        // Tentar obter usuário mesmo se sessão falhou
+        if (!session?.user) {
+          try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+              // Clonar usuário sem metadados problemáticos se necessário
+              const safeUser = { ...user }
+              if (safeUser.user_metadata?.foto_url && typeof safeUser.user_metadata.foto_url === 'string' && safeUser.user_metadata.foto_url.length > 50000) {
+                // Foto muito grande, remover temporariamente
+                console.warn('Foto muito grande nos metadados, removendo temporariamente')
+                delete safeUser.user_metadata.foto_url
+              }
+              setUser(safeUser)
+            } else {
+              setUser(null)
+            }
+          } catch (getUserError) {
+            console.error('Erro ao obter usuário:', getUserError)
+            setUser(null)
+          }
+        } else {
+          // Clonar usuário e verificar metadados
+          const safeUser = { ...session.user }
+          if (safeUser.user_metadata?.foto_url && typeof safeUser.user_metadata.foto_url === 'string' && safeUser.user_metadata.foto_url.length > 50000) {
+            // Foto muito grande, remover dos metadados locais
+            console.warn('Foto muito grande nos metadados, removendo localmente')
+            delete safeUser.user_metadata.foto_url
+          }
+          setUser(safeUser)
+        }
       } catch (error) {
         console.error('Erro ao verificar sessão:', error)
         setUser(null)
@@ -41,8 +86,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Escutar mudanças na autenticação (apenas UMA subscription para toda a aplicação)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Removido log excessivo que pode causar confusão
-      setUser(session?.user ?? null)
+      try {
+        if (session?.user) {
+          // Clonar usuário e verificar metadados
+          const safeUser = { ...session.user }
+          if (safeUser.user_metadata?.foto_url && typeof safeUser.user_metadata.foto_url === 'string' && safeUser.user_metadata.foto_url.length > 50000) {
+            // Foto muito grande, remover dos metadados locais
+            delete safeUser.user_metadata.foto_url
+          }
+          setUser(safeUser)
+        } else {
+          setUser(null)
+        }
+      } catch (error) {
+        console.error('Erro ao processar mudança de autenticação:', error)
+        setUser(null)
+      }
       setLoading(false)
     })
 

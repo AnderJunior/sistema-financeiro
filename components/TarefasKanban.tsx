@@ -62,6 +62,7 @@ export function TarefasKanban({
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
   const hasOpenedInitialTarefa = useRef(false)
+  const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     setLocalTarefas(initialTarefas)
@@ -141,7 +142,10 @@ export function TarefasKanban({
     checkScrollability()
     const handleResize = () => checkScrollability()
     window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      stopAutoScroll() // Limpar auto-scroll ao desmontar
+    }
   }, [colunasVisiveis, filteredTarefas])
 
   const scroll = (direction: 'left' | 'right') => {
@@ -160,6 +164,59 @@ export function TarefasKanban({
     })
   }
 
+  // Auto-scroll durante drag - área de detecção ampliada (200px de cada lado)
+  const SCROLL_ZONE_WIDTH = 200 // Área de detecção aumentada
+  const SCROLL_SPEED = 10 // Velocidade do scroll
+
+  const startAutoScroll = () => {
+    const handleDragOverGlobal = (e: DragEvent) => {
+      if (!scrollContainerRef.current) return
+
+      const container = scrollContainerRef.current
+      const rect = container.getBoundingClientRect()
+      const mouseX = e.clientX
+
+      // Verificar se está na zona de scroll esquerda (primeiros 200px)
+      if (mouseX >= rect.left && mouseX <= rect.left + SCROLL_ZONE_WIDTH) {
+        const { scrollLeft } = container
+        if (scrollLeft > 0) {
+          container.scrollLeft -= SCROLL_SPEED
+          checkScrollability()
+        }
+      }
+      // Verificar se está na zona de scroll direita (últimos 200px)
+      else if (mouseX >= rect.right - SCROLL_ZONE_WIDTH && mouseX <= rect.right) {
+        const { scrollLeft, scrollWidth, clientWidth } = container
+        if (scrollLeft < scrollWidth - clientWidth - 10) {
+          container.scrollLeft += SCROLL_SPEED
+          checkScrollability()
+        }
+      }
+    }
+
+    // Adicionar listener global
+    document.addEventListener('dragover', handleDragOverGlobal)
+
+    // Limpar listener quando drag terminar
+    const cleanup = () => {
+      document.removeEventListener('dragover', handleDragOverGlobal)
+    }
+
+    // Armazenar função de cleanup
+    ;(window as any).__kanbanDragCleanup = cleanup
+  }
+
+  const stopAutoScroll = () => {
+    if ((window as any).__kanbanDragCleanup) {
+      ;(window as any).__kanbanDragCleanup()
+      ;(window as any).__kanbanDragCleanup = null
+    }
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current)
+      autoScrollIntervalRef.current = null
+    }
+  }
+
   const handleDragStart = (e: DragEvent<HTMLDivElement>, tarefa: Tarefa) => {
     const target = e.target as HTMLElement
     if (target.closest('button') || target.closest('a')) {
@@ -174,6 +231,9 @@ export function TarefasKanban({
     if (e.currentTarget instanceof HTMLElement) {
       e.currentTarget.style.opacity = '0.5'
     }
+
+    // Iniciar auto-scroll quando começar a arrastar
+    startAutoScroll()
   }
 
   const handleDragEnd = (e: DragEvent<HTMLDivElement>) => {
@@ -183,6 +243,9 @@ export function TarefasKanban({
     if (e.currentTarget instanceof HTMLElement) {
       e.currentTarget.style.opacity = '1'
     }
+    
+    // Parar auto-scroll quando terminar de arrastar
+    stopAutoScroll()
   }
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>, columnId: string) => {
@@ -191,8 +254,14 @@ export function TarefasKanban({
     setDragOverColumnId(columnId)
   }
 
-  const handleDragLeave = () => {
-    setDragOverColumnId(null)
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    // Só limpar se realmente saiu da coluna (não apenas de um elemento filho)
+    const currentTarget = e.currentTarget
+    const relatedTarget = e.relatedTarget as Node | null
+    
+    if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+      setDragOverColumnId(null)
+    }
   }
 
   const handleDrop = async (e: DragEvent<HTMLDivElement>, column: TarefaKanbanColuna) => {
@@ -337,6 +406,18 @@ export function TarefasKanban({
                   width: 'calc((100% - 2rem) / 3)',
                   minWidth: '280px',
                 }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  e.dataTransfer.dropEffect = 'move'
+                  handleDragOver(e, coluna.id)
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleDragLeave(e)
+                }}
+                onDrop={(e) => handleDrop(e, coluna)}
               >
                 <div className="mb-4 space-y-1">
                   <div className="flex items-center justify-between">
@@ -354,18 +435,6 @@ export function TarefasKanban({
 
                 <div
                   className="space-y-3 min-h-[200px]"
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    e.dataTransfer.dropEffect = 'move'
-                    handleDragOver(e, coluna.id)
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    handleDragLeave()
-                  }}
-                  onDrop={(e) => handleDrop(e, coluna)}
                 >
                   {tarefasNaColuna.length === 0 ? (
                     <div

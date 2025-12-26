@@ -286,8 +286,14 @@ export function ClientesKanban({ clientes: initialClientes, viewMode, onViewMode
     setDragOverStatus(status)
   }
 
-  const handleDragLeave = () => {
-    setDragOverStatus(null)
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Só limpar se realmente saiu da coluna (não apenas de um elemento filho)
+    const currentTarget = e.currentTarget
+    const relatedTarget = e.relatedTarget as Node | null
+    
+    if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+      setDragOverStatus(null)
+    }
   }
 
   const handleDrop = async (e: React.DragEvent, targetStatus: StatusType) => {
@@ -367,6 +373,9 @@ export function ClientesKanban({ clientes: initialClientes, viewMode, onViewMode
               className={`rounded-lg bg-white border-t-4 ${config.borderColor} border border-gray-200 p-4 min-h-[400px] transition-colors ${
                 dragOverStatus === status ? 'ring-2 ring-primary-500 ring-offset-2' : ''
               }`}
+              onDragOver={(e) => handleDragOver(e, status)}
+              onDragLeave={(e) => handleDragLeave(e)}
+              onDrop={(e) => handleDrop(e, status)}
             >
               {/* Cabeçalho da coluna */}
               <div className="mb-4">
@@ -399,9 +408,6 @@ export function ClientesKanban({ clientes: initialClientes, viewMode, onViewMode
 
               <div 
                 className="space-y-3 min-h-[200px]"
-                onDragOver={(e) => handleDragOver(e, status)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, status)}
               >
                 {clientesNaColuna.length === 0 ? (
                   <div className={`text-center py-8 text-gray-400 text-sm rounded-lg border-2 border-dashed transition-colors ${
