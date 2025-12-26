@@ -5,6 +5,7 @@ import { Modal } from '@/components/ui/Modal'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/database.types'
 import { useModal } from '@/contexts/ModalContext'
+import { formatCurrencyInput, parseCurrencyValue } from '@/lib/utils'
 
 type Servico = Database['public']['Tables']['servicos']['Row']
 
@@ -34,11 +35,15 @@ export function ServicoModal({ isOpen, onClose, onSuccess, servico }: ServicoMod
   useEffect(() => {
     if (isOpen) {
       if (servico) {
+        // Formatar valor como moeda
+        const valorFormatado = servico.valor_base 
+          ? formatCurrencyInput((servico.valor_base * 100).toString())
+          : ''
         setFormData({
           nome: servico.nome || '',
           descricao: servico.descricao || '',
           tipo: servico.tipo || 'recorrente',
-          valor_base: servico.valor_base?.toString() || '',
+          valor_base: valorFormatado,
           unidade_cobranca: servico.unidade_cobranca || 'mensal',
           data_vencimento_faturas: servico.data_vencimento_faturas ? servico.data_vencimento_faturas.split('T')[0] : '',
           ativo: servico.ativo ?? true,
@@ -71,11 +76,13 @@ export function ServicoModal({ isOpen, onClose, onSuccess, servico }: ServicoMod
     setLoading(true)
 
     const supabase = createClient()
+    // Converter valor formatado para número
+    const valorNumerico = parseCurrencyValue(formData.valor_base)
     const dataToSave = {
       nome: formData.nome,
       descricao: formData.descricao || null,
       tipo: formData.tipo,
-      valor_base: parseFloat(formData.valor_base) || 0,
+      valor_base: valorNumerico,
       unidade_cobranca: formData.unidade_cobranca,
       data_vencimento_faturas: formData.data_vencimento_faturas || null,
       ativo: formData.ativo,
@@ -119,11 +126,15 @@ export function ServicoModal({ isOpen, onClose, onSuccess, servico }: ServicoMod
   const handleClose = () => {
     if (!loading) {
       if (servico) {
+        // Formatar valor como moeda
+        const valorFormatado = servico.valor_base 
+          ? formatCurrencyInput((servico.valor_base * 100).toString())
+          : ''
         setFormData({
           nome: servico.nome || '',
           descricao: servico.descricao || '',
           tipo: servico.tipo || 'recorrente',
-          valor_base: servico.valor_base?.toString() || '',
+          valor_base: valorFormatado,
           unidade_cobranca: servico.unidade_cobranca || 'mensal',
           data_vencimento_faturas: servico.data_vencimento_faturas ? servico.data_vencimento_faturas.split('T')[0] : '',
           ativo: servico.ativo ?? true,
@@ -234,13 +245,15 @@ export function ServicoModal({ isOpen, onClose, onSuccess, servico }: ServicoMod
                 Valor Base *
               </label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
                 required
                 value={formData.valor_base}
-                onChange={(e) => setFormData({ ...formData, valor_base: e.target.value })}
+                onChange={(e) => {
+                  const formatted = formatCurrencyInput(e.target.value)
+                  setFormData({ ...formData, valor_base: formatted })
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="0.00"
+                placeholder="R$ 0,00"
               />
             </div>
 

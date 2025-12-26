@@ -8,7 +8,8 @@ import { Database } from '@/types/database.types'
 import { ContasCarousel } from '@/components/ContasCarousel'
 import { TransferenciasList } from '@/components/TransferenciasList'
 import { ContaModal } from '@/components/modals/ContaModal'
-import { Wallet, Plus } from 'lucide-react'
+import { LancamentoModal } from '@/components/modals/LancamentoModal'
+import { Wallet, Plus, ArrowRightLeft } from 'lucide-react'
 import { useAssinaturaAtiva } from '@/lib/hooks/useAssinaturaAtiva'
 
 type ContaFinanceira = Database['public']['Tables']['contas_financeiras']['Row']
@@ -26,6 +27,7 @@ export default function ContasPage() {
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [contaEditando, setContaEditando] = useState<ContaFinanceira | null>(null)
+  const [isTransferenciaModalOpen, setIsTransferenciaModalOpen] = useState(false)
 
   useEffect(() => {
     async function loadData() {
@@ -133,6 +135,24 @@ export default function ContasPage() {
     }
   }
 
+  const handleTransferenciaSuccess = async () => {
+    // Recarregar transferências
+    const supabase = createClient()
+    
+    const { data: transferenciasData } = await supabase
+      .from('transferencias_bancarias')
+      .select(`
+        *,
+        banco_origem:contas_financeiras!banco_origem_id(*),
+        banco_recebedor:contas_financeiras!banco_recebedor_id(*)
+      `)
+      .order('data_transferencia', { ascending: false })
+
+    if (transferenciasData) {
+      setTransferencias(transferenciasData as Transferencia[])
+    }
+  }
+
   return (
     <div className="p-8">
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -143,13 +163,22 @@ export default function ContasPage() {
           </div>
           <p className="text-gray-600 mt-2">Visualize suas contas e transferências entre elas</p>
         </div>
-        <button
-          onClick={handleOpenModal}
-          className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Nova Conta
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsTransferenciaModalOpen(true)}
+            className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <ArrowRightLeft className="w-5 h-5" />
+            Nova Movimentação
+          </button>
+          <button
+            onClick={handleOpenModal}
+            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Nova Conta
+          </button>
+        </div>
       </div>
 
       {/* Carrossel de Contas */}
@@ -174,6 +203,14 @@ export default function ContasPage() {
         onClose={handleCloseModal}
         onSuccess={handleSuccess}
         conta={contaEditando}
+      />
+
+      {/* Modal de Transferência */}
+      <LancamentoModal
+        isOpen={isTransferenciaModalOpen}
+        onClose={() => setIsTransferenciaModalOpen(false)}
+        onSuccess={handleTransferenciaSuccess}
+        initialTab="transferencias"
       />
     </div>
   )

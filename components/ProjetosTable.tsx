@@ -175,15 +175,32 @@ export function ProjetosTable({ projetos: initialProjetos, viewMode, onViewModeC
   }, [onProjetosChange])
 
   async function loadColunasKanban() {
+    // OTIMIZADO: Verificar cache primeiro (colunas kanban raramente mudam)
+    const cacheKey = 'kanban_colunas_ativo'
+    const cached = sessionStorage.getItem(cacheKey)
+    
+    if (cached) {
+      try {
+        const data = JSON.parse(cached) as KanbanColuna[]
+        setColunasKanban(data)
+        return
+      } catch (e) {
+        // Se cache inválido, continuar com query
+      }
+    }
+    
     const supabase = createClient()
+    // OTIMIZADO: Selecionar apenas campos necessários
     const { data, error } = await supabase
       .from('kanban_colunas')
-      .select('*')
+      .select('id, nome, cor, ordem, ativo, status_servico')
       .eq('ativo', true)
       .order('ordem', { ascending: true })
 
     if (!error && data) {
       setColunasKanban(data as KanbanColuna[])
+      // Cachear por 5 minutos
+      sessionStorage.setItem(cacheKey, JSON.stringify(data))
     }
   }
 

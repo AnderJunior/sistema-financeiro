@@ -165,7 +165,7 @@ export function ContasCarousel({ contas, onEdit }: ContasCarouselProps) {
              return (
                <div
                  key={conta.id}
-                 className="flex-shrink-0 w-72 h-44 rounded-2xl p-6 relative flex flex-col justify-between overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300"
+                 className="flex-shrink-0 min-w-72 h-44 rounded-2xl p-6 relative flex flex-col justify-between overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300"
                  style={{ 
                    backgroundColor: corCard,
                    background: `linear-gradient(135deg, ${corCard} 0%, ${corCard}dd 100%)`
@@ -191,15 +191,15 @@ export function ContasCarousel({ contas, onEdit }: ContasCarouselProps) {
                  {/* Conteúdo do card */}
                  <div className="relative z-10 flex flex-col justify-between h-full">
                    {/* Parte de cima: Ícone do Banco + Valor no banco */}
-                   <div className="flex items-start justify-between">
+                   <div className="flex items-start gap-4">
                      {/* Ícone do banco - topo esquerdo */}
-                     <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                     <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 flex-shrink-0">
                        <IconeBanco className="w-7 h-7 text-white" />
                      </div>
 
-                     {/* Valor no banco - topo direito */}
-                     <div className="text-right">
-                       <span className="text-3xl font-bold text-white">
+                     {/* Valor no banco - com espaçamento fixo do ícone */}
+                     <div className="text-right flex-1 min-w-0">
+                       <span className="text-3xl font-bold text-white whitespace-nowrap">
                          {formatCurrency(conta.saldo)}
                        </span>
                      </div>

@@ -36,7 +36,12 @@ export function TransferenciasList({ transferencias }: TransferenciasListProps) 
             <div className="flex items-center gap-4 flex-1">
               {/* Conta de origem */}
               <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">
+                <div 
+                  className="text-sm font-medium"
+                  style={{ 
+                    color: transferencia.banco_origem?.cor || '#1f2937'
+                  }}
+                >
                   {transferencia.banco_origem?.nome || 'Conta não encontrada'}
                 </div>
                 <div className="text-xs text-gray-500">
@@ -56,7 +61,12 @@ export function TransferenciasList({ transferencias }: TransferenciasListProps) 
 
               {/* Conta de destino */}
               <div className="flex-1 text-right">
-                <div className="text-sm font-medium text-gray-900">
+                <div 
+                  className="text-sm font-medium"
+                  style={{ 
+                    color: transferencia.banco_recebedor?.cor || '#1f2937'
+                  }}
+                >
                   {transferencia.banco_recebedor?.nome || 'Conta não encontrada'}
                 </div>
                 <div className="text-xs text-gray-500">

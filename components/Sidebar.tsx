@@ -18,7 +18,6 @@ import {
   UserCircle,
   UsersRound,
   Wallet,
-  Zap,
   CheckSquare,
   Calendar
 } from 'lucide-react'
@@ -60,7 +59,6 @@ const menuItems: MenuItem[] = [
       { href: '/empresa/categorias', label: 'Categorias', icon: Tag },
     ]
   },
-  { href: '/automacoes', label: 'Automações', icon: Zap },
 ]
 
 export function Sidebar() {

@@ -405,7 +405,12 @@ export function FinanceiroTable({ lancamentos: initialLancamentos, transferencia
                 sortedTransferencias.map((transferencia) => (
                   <tr key={transferencia.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-4">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div 
+                        className="text-sm font-medium"
+                        style={{ 
+                          color: transferencia.banco_origem?.cor || '#1f2937'
+                        }}
+                      >
                         {transferencia.banco_origem?.nome || 'Conta não encontrada'}
                       </div>
                       <div className="text-xs text-gray-500">
@@ -418,7 +423,12 @@ export function FinanceiroTable({ lancamentos: initialLancamentos, transferencia
                       <ArrowRight className="w-5 h-5 text-primary-600" />
                     </td>
                     <td className="py-3 px-4">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div 
+                        className="text-sm font-medium"
+                        style={{ 
+                          color: transferencia.banco_recebedor?.cor || '#1f2937'
+                        }}
+                      >
                         {transferencia.banco_recebedor?.nome || 'Conta não encontrada'}
                       </div>
                       <div className="text-xs text-gray-500">

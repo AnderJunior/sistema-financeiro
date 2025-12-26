@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { createClient } from '@/lib/supabase/client'
 import { useModal } from '@/contexts/ModalContext'
 import { Database } from '@/types/database.types'
+import { formatCurrency } from '@/lib/utils'
 
 type Lancamento = Database['public']['Tables']['financeiro_lancamentos']['Row']
 
@@ -13,6 +14,7 @@ interface LancamentoModalProps {
   onClose: () => void
   onSuccess?: () => void
   lancamento?: Lancamento | null
+  initialTab?: 'entrada' | 'saida' | 'transferencias'
 }
 
 // Helper para formatar valor em R$
@@ -41,14 +43,18 @@ function parseCurrencyValue(formattedValue: string): number {
   return parseFloat(numbers) / 100
 }
 
-export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: LancamentoModalProps) {
+export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento, initialTab }: LancamentoModalProps) {
   const { alert } = useModal()
   const [loading, setLoading] = useState(false)
   const [categorias, setCategorias] = useState<any[]>([])
   const [clientes, setClientes] = useState<any[]>([])
   const [contasFinanceiras, setContasFinanceiras] = useState<any[]>([])
   const isEditMode = !!lancamento
-  const [activeTab, setActiveTab] = useState<'entrada' | 'saida' | 'transferencias'>('entrada')
+  const [activeTab, setActiveTab] = useState<'entrada' | 'saida' | 'transferencias'>(initialTab || 'entrada')
+  const [saldoOrigem, setSaldoOrigem] = useState<number | null>(null)
+  const [saldoRecebedor, setSaldoRecebedor] = useState<number | null>(null)
+  const [calculandoSaldoOrigem, setCalculandoSaldoOrigem] = useState(false)
+  const [calculandoSaldoRecebedor, setCalculandoSaldoRecebedor] = useState(false)
   
   const [formData, setFormData] = useState({
     tipo: 'entrada' as 'entrada' | 'saida',
@@ -132,9 +138,11 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
       })
     } else if (isOpen && !lancamento) {
       // Reset form quando não estiver editando
-      setActiveTab('entrada')
+      // Usar initialTab se fornecido, senão usar 'entrada'
+      const tabToUse = initialTab || 'entrada'
+      setActiveTab(tabToUse)
       setFormData({
-        tipo: 'entrada',
+        tipo: tabToUse === 'transferencias' ? 'entrada' : tabToUse,
         categoria_id: '',
         cliente_id: '',
         descricao: '',
@@ -147,7 +155,14 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
         conta_id: '',
       })
     }
-  }, [isOpen, lancamento])
+  }, [isOpen, lancamento, initialTab])
+
+  // Atualizar aba inicial quando o modal abrir com initialTab
+  useEffect(() => {
+    if (isOpen && !lancamento && initialTab) {
+      setActiveTab(initialTab)
+    }
+  }, [isOpen, initialTab, lancamento])
 
   // Atualizar tipo quando a aba mudar (apenas para entrada/saída)
   useEffect(() => {
@@ -343,6 +358,85 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
     setTransferenciaData({ ...transferenciaData, valor_enviado: formatted })
   }
 
+  // Função para calcular o saldo de uma conta
+  const calcularSaldoConta = useCallback(async (contaId: string): Promise<number> => {
+    if (!contaId) return 0
+    
+    const supabase = createClient()
+    let saldo = 0
+
+    // Buscar lançamentos financeiros da conta (apenas pagos)
+    const { data: lancamentos } = await supabase
+      .from('financeiro_lancamentos')
+      .select('tipo, valor, status')
+      .eq('conta_id', contaId)
+      .eq('status', 'pago')
+
+    if (lancamentos) {
+      lancamentos.forEach((lancamento) => {
+        if (lancamento.tipo === 'entrada') {
+          saldo += Number(lancamento.valor)
+        } else {
+          saldo -= Number(lancamento.valor)
+        }
+      })
+    }
+
+    // Buscar transferências onde a conta é origem (subtrai)
+    const { data: transferenciasSaida } = await supabase
+      .from('transferencias_bancarias')
+      .select('valor_enviado')
+      .eq('banco_origem_id', contaId)
+
+    if (transferenciasSaida) {
+      transferenciasSaida.forEach((t) => {
+        saldo -= Number(t.valor_enviado)
+      })
+    }
+
+    // Buscar transferências onde a conta é destino (adiciona)
+    const { data: transferenciasEntrada } = await supabase
+      .from('transferencias_bancarias')
+      .select('valor_enviado')
+      .eq('banco_recebedor_id', contaId)
+
+    if (transferenciasEntrada) {
+      transferenciasEntrada.forEach((t) => {
+        saldo += Number(t.valor_enviado)
+      })
+    }
+
+    return saldo
+  }, [])
+
+  // Calcular saldo quando o banco origem for selecionado
+  useEffect(() => {
+    if (activeTab === 'transferencias' && transferenciaData.banco_origem_id) {
+      setCalculandoSaldoOrigem(true)
+      calcularSaldoConta(transferenciaData.banco_origem_id).then((saldo) => {
+        setSaldoOrigem(saldo)
+        setCalculandoSaldoOrigem(false)
+      })
+    } else {
+      setSaldoOrigem(null)
+      setCalculandoSaldoOrigem(false)
+    }
+  }, [transferenciaData.banco_origem_id, activeTab, calcularSaldoConta])
+
+  // Calcular saldo quando o banco recebedor for selecionado
+  useEffect(() => {
+    if (activeTab === 'transferencias' && transferenciaData.banco_recebedor_id) {
+      setCalculandoSaldoRecebedor(true)
+      calcularSaldoConta(transferenciaData.banco_recebedor_id).then((saldo) => {
+        setSaldoRecebedor(saldo)
+        setCalculandoSaldoRecebedor(false)
+      })
+    } else {
+      setSaldoRecebedor(null)
+      setCalculandoSaldoRecebedor(false)
+    }
+  }, [transferenciaData.banco_recebedor_id, activeTab, calcularSaldoConta])
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={isEditMode ? "Editar lançamento" : "Adicionar lançamento"}>
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -401,6 +495,15 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
                   <option key={conta.id} value={conta.id}>{conta.nome}</option>
                 ))}
               </select>
+              {transferenciaData.banco_origem_id && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {calculandoSaldoOrigem ? (
+                    'Calculando saldo...'
+                  ) : (
+                    `Saldo disponível: ${formatCurrency(saldoOrigem || 0)}`
+                  )}
+                </p>
+              )}
             </div>
 
             <div>
@@ -418,6 +521,15 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
                   <option key={conta.id} value={conta.id}>{conta.nome}</option>
                 ))}
               </select>
+              {transferenciaData.banco_recebedor_id && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {calculandoSaldoRecebedor ? (
+                    'Calculando saldo...'
+                  ) : (
+                    `Saldo atual: ${formatCurrency(saldoRecebedor || 0)}`
+                  )}
+                </p>
+              )}
             </div>
 
             <div>
@@ -593,7 +705,7 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Banco recebedor *
+                  {activeTab === 'saida' ? 'Banco de origem *' : 'Banco recebedor *'}
                 </label>
                 <select
                   required
@@ -609,30 +721,35 @@ export function LancamentoModal({ isOpen, onClose, onSuccess, lancamento }: Lanc
                   ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Selecione em qual banco o valor foi recebido/pago
+                  {activeTab === 'saida' 
+                    ? 'Selecione de qual banco o valor foi pago/saído'
+                    : 'Selecione em qual banco o valor foi recebido'}
                 </p>
               </div>
             </>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Forma de Pagamento (Opcional)
-            </label>
-            <select
-              value={formData.forma_pagamento}
-              onChange={(e) => setFormData({ ...formData, forma_pagamento: e.target.value as any })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="">Selecione</option>
-              <option value="pix">PIX</option>
-              <option value="boleto">Boleto</option>
-              <option value="cartao">Cartão</option>
-              <option value="transferencia">Transferência</option>
-              <option value="dinheiro">Dinheiro</option>
-              <option value="outro">Outro</option>
-            </select>
-          </div>
+          {/* Forma de Pagamento: só aparece se for entrada com status pago OU se for saída */}
+          {((activeTab === 'entrada' && formData.status === 'pago') || activeTab === 'saida') && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Forma de Pagamento (Opcional)
+              </label>
+              <select
+                value={formData.forma_pagamento}
+                onChange={(e) => setFormData({ ...formData, forma_pagamento: e.target.value as any })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="">Selecione</option>
+                <option value="pix">PIX</option>
+                <option value="boleto">Boleto</option>
+                <option value="cartao">Cartão</option>
+                <option value="transferencia">Transferência</option>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+          )}
         </div>
         )}
 

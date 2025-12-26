@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { useModal } from '@/contexts/ModalContext'
+import { formatCurrencyInput, parseCurrencyValue } from '@/lib/utils'
 
 export default function NovoLancamentoPage() {
   const router = useRouter()
@@ -68,6 +69,8 @@ export default function NovoLancamentoPage() {
     setLoading(true)
 
     const supabase = createClient()
+    // Converter valor formatado para número
+    const valorNumerico = parseCurrencyValue(formData.valor)
     const { error } = await supabase
       .from('financeiro_lancamentos')
       .insert([{
@@ -81,7 +84,7 @@ export default function NovoLancamentoPage() {
         data_vencimento: formData.data_vencimento || null,
         data_pagamento: formData.data_pagamento || null,
         forma_pagamento: formData.forma_pagamento || null,
-        valor: parseFloat(formData.valor),
+        valor: valorNumerico,
       }])
 
     if (!error) {
@@ -274,12 +277,15 @@ export default function NovoLancamentoPage() {
                 Valor *
               </label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
                 required
                 value={formData.valor}
-                onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+                onChange={(e) => {
+                  const formatted = formatCurrencyInput(e.target.value)
+                  setFormData({ ...formData, valor: formatted })
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="R$ 0,00"
               />
             </div>
 

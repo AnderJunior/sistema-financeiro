@@ -63,34 +63,34 @@ export default function DashboardPage() {
     const endDate = new Date(dateRange.end)
     endDate.setHours(23, 59, 59, 999)
 
-    // Buscar todos os dados em paralelo
+    // OTIMIZADO: Buscar todos os dados em paralelo com queries otimizadas
     const [
       clientesMesResult,
       clientesFinalizadosResult,
       clientesPendentesResult,
       entradasResult
     ] = await Promise.all([
-      // Clientes cadastrados no período selecionado
+      // OTIMIZADO: Usar count apenas, sem buscar dados
       supabase
         .from('clientes')
         .select('*', { count: 'exact', head: true })
         .gte('data_cadastro', startDate.toISOString())
         .lte('data_cadastro', endDate.toISOString()),
-      // Clientes finalizados no período selecionado
+      // OTIMIZADO: Usar count apenas, sem buscar dados
       supabase
         .from('clientes')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'finalizado')
         .gte('data_cadastro', startDate.toISOString())
         .lte('data_cadastro', endDate.toISOString()),
-      // Clientes pendentes no período selecionado
+      // OTIMIZADO: Usar count apenas, sem buscar dados
       supabase
         .from('clientes')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'a_iniciar')
         .gte('data_cadastro', startDate.toISOString())
         .lte('data_cadastro', endDate.toISOString()),
-      // Entradas do período selecionado
+      // OTIMIZADO: Buscar apenas campo valor necessário
       supabase
         .from('financeiro_lancamentos')
         .select('valor')
@@ -112,38 +112,55 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadData()
-    // Verificar serviços atrasados ao carregar o dashboard
-    verificarServicosAtrasados()
+    // OTIMIZADO: Verificar serviços atrasados em background (não bloquear UI)
+    verificarServicosAtrasados().catch(console.error)
 
-    // OTIMIZADO: Consolidar subscriptions em um único canal
+    // OTIMIZADO: Consolidar subscriptions em um único canal com debounce
     const supabase = createClient()
+    let debounceTimer: NodeJS.Timeout | null = null
+    
     const channel = supabase
       .channel('dashboard_changes')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: '*', // INSERT, UPDATE, DELETE
           schema: 'public',
           table: 'financeiro_lancamentos',
         },
-        async () => {
-          await loadData()
+        () => {
+          // OTIMIZADO: Debounce para evitar múltiplas atualizações rápidas
+          if (debounceTimer) {
+            clearTimeout(debounceTimer)
+          }
+          debounceTimer = setTimeout(() => {
+            loadData()
+          }, 300)
         }
       )
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: '*', // INSERT, UPDATE, DELETE
           schema: 'public',
           table: 'clientes',
         },
-        async () => {
-          await loadData()
+        () => {
+          // OTIMIZADO: Debounce para evitar múltiplas atualizações rápidas
+          if (debounceTimer) {
+            clearTimeout(debounceTimer)
+          }
+          debounceTimer = setTimeout(() => {
+            loadData()
+          }, 300)
         }
       )
       .subscribe()
 
     return () => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+      }
       supabase.removeChannel(channel)
     }
   }, [dateRange])

@@ -28,59 +28,64 @@ export function CobrancasCliente({ clienteId }: CobrancasClienteProps) {
   const loadCobrancas = useCallback(async () => {
     const supabase = createClient()
     
+    // OTIMIZADO: Buscar apenas campos necessários e usar select específico
     const { data } = await supabase
       .from('financeiro_lancamentos')
       .select(`
-        *,
-        servicos (*)
+        id,
+        valor,
+        status,
+        data_vencimento,
+        data_pagamento,
+        descricao,
+        invoice_url,
+        servicos (
+          id,
+          nome,
+          descricao
+        )
       `)
       .eq('cliente_id', clienteId)
       .eq('tipo', 'entrada')
       .in('status', ['previsto', 'em_atraso', 'pago'])
       .order('data_vencimento', { ascending: true })
     
-    // Garantir que invoice_url está incluído (pode não estar no tipo do banco ainda)
-    if (data) {
-      data.forEach((item: any) => {
-        if (!item.invoice_url) {
-          item.invoice_url = null
-        }
-      })
-    }
-
     if (data) {
       // Verificar e atualizar status automático para "Atrasado"
       const hoje = new Date()
       hoje.setHours(0, 0, 0, 0)
       
-      // Atualizar cobranças atrasadas em lote
-      const cobrancasParaAtualizar = data.filter((cobranca) => {
-        if (cobranca.status === 'pago') {
-          return false
+      // OTIMIZADO: Filtrar e atualizar em uma única passada
+      const cobrancasParaAtualizar: string[] = []
+      const cobrancasAtualizadas = data.map((cobranca: any) => {
+        // Garantir que invoice_url está incluído
+        if (!cobranca.invoice_url) {
+          cobranca.invoice_url = null
         }
-        const vencimento = cobranca.data_vencimento ? new Date(cobranca.data_vencimento) : null
-        return vencimento && vencimento < hoje && cobranca.status !== 'em_atraso'
-      })
-
-      if (cobrancasParaAtualizar.length > 0) {
-        const idsParaAtualizar = cobrancasParaAtualizar.map(c => c.id)
-        await supabase
-          .from('financeiro_lancamentos')
-          .update({ status: 'em_atraso' })
-          .in('id', idsParaAtualizar)
-      }
-
-      // Atualizar o estado local das cobranças
-      const cobrancasAtualizadas = data.map((cobranca) => {
+        
         if (cobranca.status === 'pago') {
           return cobranca
         }
+        
         const vencimento = cobranca.data_vencimento ? new Date(cobranca.data_vencimento) : null
         if (vencimento && vencimento < hoje && cobranca.status !== 'em_atraso') {
+          cobrancasParaAtualizar.push(cobranca.id)
           return { ...cobranca, status: 'em_atraso' as const }
         }
         return cobranca
       })
+
+      // OTIMIZADO: Atualizar apenas se houver cobranças para atualizar
+      if (cobrancasParaAtualizar.length > 0) {
+        // Não aguardar a atualização para não bloquear a UI
+        supabase
+          .from('financeiro_lancamentos')
+          .update({ status: 'em_atraso' })
+          .in('id', cobrancasParaAtualizar)
+          .then(() => {
+            // Atualização em background, não precisa recarregar
+          })
+      }
       
       setCobrancas(cobrancasAtualizadas as Lancamento[])
     }
@@ -207,7 +212,7 @@ export function CobrancasCliente({ clienteId }: CobrancasClienteProps) {
                   <div className="flex items-start gap-3 flex-1">
                     <Icon className={`w-5 h-5 ${statusInfo.color} mt-0.5 flex-shrink-0`} />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-gray-900" style={{ fontSize: '14px' }}>
                         {cobranca.servicos?.nome || cobranca.descricao}
                       </p>
                       <p className="text-sm text-gray-600 mt-1">

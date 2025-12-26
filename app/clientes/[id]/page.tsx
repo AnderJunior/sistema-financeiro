@@ -9,6 +9,7 @@ import { ArrowLeft } from 'lucide-react'
 import { ServicosCliente } from '@/components/ServicosCliente'
 import { CobrancasCliente } from '@/components/CobrancasCliente'
 import { GruposCliente } from '@/components/GruposCliente'
+import { TarefasCliente } from '@/components/TarefasCliente'
 import { ClienteDetailWrapper } from '@/components/ClienteDetailWrapper'
 import { ClienteStatusEditor } from '@/components/ClienteStatusEditor'
 import { ScrollToHash } from '@/components/ScrollToHash'
@@ -33,21 +34,24 @@ export default function ClienteDetailPage({ params }: { params: { id: string } }
   useEffect(() => {
     async function loadCliente() {
       try {
-        // Verificar autenticação primeiro
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        // OTIMIZADO: Buscar usuário e cliente em paralelo (RLS garante segurança)
+        const [authResult, clienteResult] = await Promise.all([
+          supabase.auth.getUser(),
+          supabase
+            .from('clientes')
+            .select('*')
+            .eq('id', clienteId)
+            .single()
+        ])
+        
+        const { data: { user }, error: authError } = authResult
+        const { data: clienteData, error: clienteError } = clienteResult
         
         if (authError || !user) {
           setError('Você precisa estar autenticado para visualizar este cliente.')
           setLoading(false)
           return
         }
-        
-        // Buscar o cliente
-        const { data: clienteData, error: clienteError } = await supabase
-          .from('clientes')
-          .select('*')
-          .eq('id', clienteId)
-          .single()
 
         if (clienteError) {
           setError(clienteError.message || 'Cliente não encontrado')
@@ -176,16 +180,19 @@ export default function ClienteDetailPage({ params }: { params: { id: string } }
             </div>
           </Card>
 
+          {/* Tarefas do Cliente */}
+          <TarefasCliente clienteId={cliente.id} />
+
           {/* Projetos do Cliente */}
           <ServicosCliente clienteId={cliente.id} />
-
-          {/* Cobranças Ativas */}
-          <CobrancasCliente clienteId={cliente.id} />
         </div>
 
         <div className="space-y-6">
           {/* Grupos */}
           <GruposCliente clienteId={cliente.id} />
+
+          {/* Cobranças Ativas */}
+          <CobrancasCliente clienteId={cliente.id} />
         </div>
       </div>
     </div>

@@ -72,3 +72,4 @@ $$;
 COMMENT ON FUNCTION atualizar_cobrancas_atrasadas() IS 
 'Função para atualizar cobranças existentes que estão atrasadas. Pode ser chamada manualmente ou via cron job. search_path fixado para segurança.';
 
+

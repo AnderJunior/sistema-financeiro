@@ -8,13 +8,10 @@ import { PageLoading } from '@/components/PageLoading'
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   
-  // Verificar se estamos em uma rota de edição de fluxo
-  const isWorkflowBuilder = pathname?.startsWith('/automacoes/') && pathname !== '/automacoes'
-  
   // Verificar se estamos em uma página de autenticação
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password' || pathname === '/reset-password'
 
-  if (isWorkflowBuilder || isAuthPage) {
+  if (isAuthPage) {
     // Layout fullscreen sem sidebar e topbar
     return (
       <>

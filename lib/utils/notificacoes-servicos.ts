@@ -31,14 +31,24 @@ export async function verificarServicosAtrasados(): Promise<void> {
   const hojeISO = hoje.toISOString().split('T')[0]
 
   try {
-    // Buscar todos os lançamentos que são serviços com vencimento até hoje (incluindo hoje)
+    // OTIMIZADO: Buscar apenas campos necessários para verificação de serviços atrasados
     // Usar .lte() para incluir serviços que vencem hoje também
     const { data: lancamentos, error } = await supabase
       .from('financeiro_lancamentos')
       .select(`
-        *,
-        servicos (*),
-        clientes (*)
+        id,
+        servico_id,
+        cliente_id,
+        data_vencimento,
+        status_servico,
+        servicos (
+          id,
+          nome
+        ),
+        clientes (
+          id,
+          nome
+        )
       `)
       .not('servico_id', 'is', null)
       .not('data_vencimento', 'is', null)

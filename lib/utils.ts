@@ -106,3 +106,60 @@ export function maskCPFCNPJ(value: string, tipoPessoa: 'PF' | 'PJ'): string {
   return maskCNPJ(value)
 }
 
+/**
+ * Formata um valor numérico como moeda brasileira (R$)
+ * @param value - String com o valor digitado
+ * @returns String formatada como R$ 0,00
+ */
+export function formatCurrencyInput(value: string): string {
+  // Remove tudo que não é dígito
+  const numbers = value.replace(/\D/g, '')
+  
+  if (!numbers) return ''
+  
+  // Converte para número e divide por 100 para ter centavos
+  const amount = parseFloat(numbers) / 100
+  
+  // Formata como moeda brasileira
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+/**
+ * Extrai o valor numérico de uma string formatada como moeda
+ * @param formattedValue - String formatada como R$ 0,00
+ * @returns Número com o valor
+ */
+export function parseCurrencyValue(formattedValue: string): number {
+  const numbers = formattedValue.replace(/\D/g, '')
+  if (!numbers) return 0
+  return parseFloat(numbers) / 100
+}
+
+/**
+ * Formata um número de telefone no formato (99) 9 9999-9999
+ * @param value - String com o número digitado
+ * @returns String formatada como (99) 9 9999-9999
+ */
+export function maskPhone(value: string): string {
+  // Remove tudo que não é dígito
+  const numbers = value.replace(/\D/g, '')
+  
+  if (!numbers) return ''
+  
+  // Aplica a máscara (99) 9 9999-9999
+  if (numbers.length <= 2) {
+    return `(${numbers}`
+  } else if (numbers.length <= 3) {
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`
+  } else if (numbers.length <= 7) {
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 3)} ${numbers.slice(3)}`
+  } else {
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 3)} ${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`
+  }
+}
+

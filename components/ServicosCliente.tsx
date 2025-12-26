@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/Card'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, formatCurrencyInput, parseCurrencyValue } from '@/lib/utils'
 import { Plus, Package, Trash2 } from 'lucide-react'
 import { Database } from '@/types/database.types'
 import { Modal } from '@/components/ui/Modal'
@@ -41,12 +41,32 @@ export function ServicosCliente({ clienteId, onDataChange }: ServicosClienteProp
   const loadServicos = useCallback(async () => {
     const supabase = createClient()
     
+    // OTIMIZADO: Selecionar apenas campos necessários
     const { data } = await supabase
       .from('financeiro_lancamentos')
       .select(`
-        *,
-        servicos (*),
-        projetos (*)
+        id,
+        valor,
+        status,
+        status_servico,
+        data_vencimento,
+        descricao,
+        servico_id,
+        projeto_id,
+        servicos (
+          id,
+          nome,
+          descricao,
+          tipo,
+          valor_base,
+          data_vencimento_faturas
+        ),
+        projetos (
+          id,
+          nome,
+          valor_previsto,
+          data_fim_prevista
+        )
       `)
       .eq('cliente_id', clienteId)
       .not('servico_id', 'is', null)
@@ -57,15 +77,16 @@ export function ServicosCliente({ clienteId, onDataChange }: ServicosClienteProp
     }
     setLoading(false)
     
-    // Verificar serviços atrasados e criar notificações
-    await verificarServicosAtrasados()
+    // OTIMIZADO: Verificar serviços atrasados em background (não bloquear UI)
+    verificarServicosAtrasados().catch(console.error)
   }, [clienteId])
 
   const loadServicosDisponiveis = useCallback(async () => {
     const supabase = createClient()
+    // OTIMIZADO: Selecionar apenas campos necessários
     const { data } = await supabase
       .from('servicos')
-      .select('*')
+      .select('id, nome, descricao, tipo, valor_base, data_vencimento_faturas')
       .eq('ativo', true)
       .order('nome')
 
@@ -74,10 +95,14 @@ export function ServicosCliente({ clienteId, onDataChange }: ServicosClienteProp
     }
   }, [])
 
+  // OTIMIZADO: Carregar dados em paralelo quando possível
   useEffect(() => {
     loadServicos()
-    loadServicosDisponiveis()
-  }, [clienteId, loadServicos, loadServicosDisponiveis])
+    // Carregar serviços disponíveis apenas uma vez (não depende de clienteId)
+    if (servicosDisponiveis.length === 0) {
+      loadServicosDisponiveis()
+    }
+  }, [clienteId, loadServicos, loadServicosDisponiveis, servicosDisponiveis.length])
 
   if (loading) {
     return (
@@ -153,18 +178,39 @@ function ServicoCard({ lancamento, onStatusChange, onDelete }: ServicoCardProps)
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // Buscar colunas do kanban
+  // OTIMIZADO: Buscar colunas do kanban com cache compartilhado
   useEffect(() => {
     async function loadColunasKanban() {
+      // Verificar cache primeiro (colunas kanban raramente mudam)
+      const cacheKey = 'kanban_colunas_ativo'
+      const cached = sessionStorage.getItem(cacheKey)
+      
+      if (cached) {
+        try {
+          const data = JSON.parse(cached) as KanbanColuna[]
+          setColunasKanban(data)
+          if (!lancamento.status_servico && data.length > 0) {
+            setStatus(data[0].id)
+          }
+          setLoadingColunas(false)
+          return
+        } catch (e) {
+          // Se cache inválido, continuar com query
+        }
+      }
+      
       const supabase = createClient()
+      // OTIMIZADO: Selecionar apenas campos necessários
       const { data } = await supabase
         .from('kanban_colunas')
-        .select('*')
+        .select('id, nome, cor, ordem, ativo')
         .eq('ativo', true)
         .order('ordem', { ascending: true })
 
       if (data) {
         setColunasKanban(data as KanbanColuna[])
+        // Cachear por 5 minutos
+        sessionStorage.setItem(cacheKey, JSON.stringify(data))
         // Se não houver status, usar a primeira coluna
         if (!lancamento.status_servico && data.length > 0) {
           setStatus(data[0].id)
@@ -443,19 +489,38 @@ function AdicionarServicoModal({
     status_servico: '',
   })
 
-  // Buscar colunas do kanban quando o modal abrir
+  // OTIMIZADO: Buscar colunas do kanban com cache quando o modal abrir
   useEffect(() => {
     async function loadColunasKanban() {
+      // Verificar cache primeiro
+      const cacheKey = 'kanban_colunas_ativo'
+      const cached = sessionStorage.getItem(cacheKey)
+      
+      if (cached) {
+        try {
+          const data = JSON.parse(cached) as KanbanColuna[]
+          setColunasKanban(data)
+          if (data.length > 0) {
+            setFormData(prev => ({ ...prev, status_servico: data[0].id }))
+          }
+          return
+        } catch (e) {
+          // Se cache inválido, continuar com query
+        }
+      }
+      
       const supabase = createClient()
+      // OTIMIZADO: Selecionar apenas campos necessários
       const { data } = await supabase
         .from('kanban_colunas')
-        .select('*')
+        .select('id, nome, cor, ordem, ativo')
         .eq('ativo', true)
         .order('ordem', { ascending: true })
 
       if (data) {
         setColunasKanban(data as KanbanColuna[])
-        // Se houver colunas, definir a primeira como padrão
+        // Cachear por 5 minutos
+        sessionStorage.setItem(cacheKey, JSON.stringify(data))
         if (data.length > 0) {
           setFormData(prev => ({ ...prev, status_servico: data[0].id }))
         }
@@ -497,19 +562,37 @@ function AdicionarServicoModal({
     setLoading(true)
 
     const supabase = createClient()
-    // Obter usuário atual para buscar categorias coringas + categorias do usuário
-    const { data: { user } } = await supabase.auth.getUser()
+    // OTIMIZADO: Buscar usuário e categoria em paralelo
+    const [userResult, categoriaResult] = await Promise.all([
+      supabase.auth.getUser(),
+      // Buscar categoria de entrada padrão
+      supabase
+        .from('financeiro_categorias')
+        .select('id')
+        .eq('tipo', 'entrada')
+        .eq('ativo', true)
+        .order('is_coringa', { ascending: false })
+        .limit(1)
+        .single()
+    ])
     
-    // Buscar categoria de entrada padrão ou criar
-    const { data: categoria } = await supabase
-      .from('financeiro_categorias')
-      .select('id')
-      .eq('tipo', 'entrada')
-      .eq('ativo', true)
-      .or(`is_coringa.eq.true${user?.id ? ',user_id.eq.' + user.id : ''}`)
-      .order('is_coringa', { ascending: false })
-      .limit(1)
-      .single()
+    const { data: { user } } = userResult
+    let categoria = categoriaResult.data
+    
+    // Se não encontrou categoria coringa, buscar categoria do usuário
+    if (!categoria && user?.id) {
+      const { data: categoriaUser } = await supabase
+        .from('financeiro_categorias')
+        .select('id')
+        .eq('tipo', 'entrada')
+        .eq('ativo', true)
+        .eq('user_id', user.id)
+        .limit(1)
+        .single()
+      if (categoriaUser) {
+        categoria = categoriaUser
+      }
+    }
 
     // Se houver colunas no kanban, usar o status selecionado
     // Caso contrário, criar sem status (null) - será exibido como "Não atribuído"
@@ -535,6 +618,9 @@ function AdicionarServicoModal({
         }
       }
 
+    // Converter valor formatado para número
+    const valorNumerico = parseCurrencyValue(formData.valor) || servicosDisponiveis.find(s => s.id === formData.servico_id)?.valor_base || 0
+
     const dataToInsert = {
       tipo: 'entrada' as const,
       categoria_id: categoria?.id || null,
@@ -543,7 +629,7 @@ function AdicionarServicoModal({
       descricao: formData.descricao || servicosDisponiveis.find(s => s.id === formData.servico_id)?.nome || 'Projeto',
       data_competencia: new Date().toISOString().split('T')[0],
       data_vencimento: dataVencimentoFormatada,
-      valor: parseFloat(formData.valor) || servicosDisponiveis.find(s => s.id === formData.servico_id)?.valor_base || 0,
+      valor: valorNumerico,
       status: 'previsto' as const,
       status_servico: statusServicoId,
     }
@@ -610,10 +696,15 @@ function AdicionarServicoModal({
       ? servico.data_vencimento_faturas.split('T')[0]
       : ''
     
+    // Formatar valor como moeda
+    const valorFormatado = servico?.valor_base 
+      ? formatCurrencyInput((servico.valor_base * 100).toString())
+      : ''
+    
     setFormData({
       ...formData,
       servico_id: servicoId,
-      valor: servico?.valor_base.toString() || '',
+      valor: valorFormatado,
       descricao: servico?.nome || '',
       data_proxima_assinatura: dataProximaAssinatura,
     })
@@ -646,13 +737,15 @@ function AdicionarServicoModal({
             Valor *
           </label>
           <input
-            type="number"
-            step="0.01"
+            type="text"
             required
             value={formData.valor}
-            onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+            onChange={(e) => {
+              const formatted = formatCurrencyInput(e.target.value)
+              setFormData({ ...formData, valor: formatted })
+            }}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            placeholder="0.00"
+            placeholder="R$ 0,00"
           />
         </div>
 

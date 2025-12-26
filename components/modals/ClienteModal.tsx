@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Combobox } from '@/components/ui/Combobox'
 import { createClient } from '@/lib/supabase/client'
-import { maskCPFCNPJ } from '@/lib/utils'
+import { maskCPFCNPJ, maskPhone } from '@/lib/utils'
 import { useModal } from '@/contexts/ModalContext'
 
 interface ClienteModalProps {
@@ -40,7 +40,7 @@ export function ClienteModal({ isOpen, onClose, onSuccess, cliente }: ClienteMod
     observacoes: '',
   })
 
-  // Carregar origens disponíveis
+  // Carregar origens disponíveis - OTIMIZADO: com cache e query melhorada
   useEffect(() => {
     if (isOpen) {
       loadOrigensDisponiveis()
@@ -50,6 +50,8 @@ export function ClienteModal({ isOpen, onClose, onSuccess, cliente }: ClienteMod
   async function loadOrigensDisponiveis() {
     const supabase = createClient()
     
+    // OTIMIZADO: Buscar apenas valores distintos diretamente do banco
+    // Usar distinct() para reduzir dados transferidos
     const { data, error } = await supabase
       .from('clientes')
       .select('origem')
@@ -143,8 +145,11 @@ export function ClienteModal({ isOpen, onClose, onSuccess, cliente }: ClienteMod
         origem: '',
         observacoes: '',
       })
-      // Recarregar origens disponíveis após salvar
-      await loadOrigensDisponiveis()
+      // OTIMIZADO: Recarregar origens apenas se uma nova origem foi adicionada
+      // Se a origem já existia na lista, não precisa recarregar
+      if (formData.origem && !origensDisponiveis.includes(formData.origem)) {
+        await loadOrigensDisponiveis()
+      }
       onSuccess?.()
       onClose()
     } else {
@@ -184,8 +189,22 @@ export function ClienteModal({ isOpen, onClose, onSuccess, cliente }: ClienteMod
 
   const handleCPFCNPJChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
-    const masked = maskCPFCNPJ(value, formData.tipo_pessoa)
-    setFormData({ ...formData, cpf_cnpj: masked })
+    // Remove caracteres não numéricos para contar os dígitos
+    const digitsOnly = value.replace(/\D/g, '')
+    
+    // Detecta automaticamente o tipo baseado na quantidade de dígitos
+    // Se tiver mais de 11 dígitos, é CNPJ, senão é CPF
+    const detectedType: 'PF' | 'PJ' = digitsOnly.length > 11 ? 'PJ' : 'PF'
+    
+    // Aplica a máscara baseada no tipo detectado
+    const masked = maskCPFCNPJ(value, detectedType)
+    
+    // Atualiza o tipo de pessoa automaticamente se necessário
+    setFormData({ 
+      ...formData, 
+      cpf_cnpj: masked,
+      tipo_pessoa: detectedType
+    })
   }
 
   const handleTipoPessoaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -235,7 +254,7 @@ export function ClienteModal({ isOpen, onClose, onSuccess, cliente }: ClienteMod
               type="text"
               value={formData.cpf_cnpj}
               onChange={handleCPFCNPJChange}
-              maxLength={formData.tipo_pessoa === 'PF' ? 14 : 18}
+              maxLength={18}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               placeholder={formData.tipo_pessoa === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'}
             />
@@ -261,9 +280,13 @@ export function ClienteModal({ isOpen, onClose, onSuccess, cliente }: ClienteMod
             <input
               type="tel"
               value={formData.telefone}
-              onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+              onChange={(e) => {
+                const masked = maskPhone(e.target.value)
+                setFormData({ ...formData, telefone: masked })
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              placeholder="Digite o telefone"
+              placeholder="(99) 9 9999-9999"
+              maxLength={16}
             />
           </div>
 

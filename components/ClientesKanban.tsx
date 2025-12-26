@@ -34,24 +34,27 @@ interface ClientesKanbanProps {
 
 type StatusType = 'a_iniciar' | 'em_andamento' | 'finalizado'
 
-const statusConfig: Record<StatusType, { label: string; color: string; bgColor: string; borderColor: string }> = {
+const statusConfig: Record<StatusType, { label: string; color: string; bgColor: string; borderColor: string; cor: string }> = {
   a_iniciar: {
     label: 'A iniciar',
     color: 'text-yellow-800',
     bgColor: 'bg-yellow-50',
-    borderColor: 'border-yellow-500'
+    borderColor: 'border-yellow-500',
+    cor: '#FCD34D' // Amarelo
   },
   em_andamento: {
     label: 'Em andamento',
     color: 'text-blue-800',
     bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-500'
+    borderColor: 'border-blue-500',
+    cor: '#3B82F6' // Azul
   },
   finalizado: {
     label: 'Finalizado',
     color: 'text-green-800',
     bgColor: 'bg-green-50',
-    borderColor: 'border-green-500'
+    borderColor: 'border-green-500',
+    cor: '#10B981' // Verde
   }
 }
 
@@ -370,9 +373,12 @@ export function ClientesKanban({ clientes: initialClientes, viewMode, onViewMode
           return (
             <div
               key={status}
-              className={`rounded-lg bg-white border-t-4 ${config.borderColor} border border-gray-200 p-4 min-h-[400px] transition-colors ${
+              className={`flex-shrink-0 rounded-lg bg-white border-t-4 border border-gray-200 p-4 min-h-[400px] transition-all ${
                 dragOverStatus === status ? 'ring-2 ring-primary-500 ring-offset-2' : ''
               }`}
+              style={{
+                borderTopColor: config.cor,
+              }}
               onDragOver={(e) => handleDragOver(e, status)}
               onDragLeave={(e) => handleDragLeave(e)}
               onDrop={(e) => handleDrop(e, status)}
@@ -381,7 +387,10 @@ export function ClientesKanban({ clientes: initialClientes, viewMode, onViewMode
               <div className="mb-4">
                 {/* Nome da coluna + Botão de opções */}
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className={`font-semibold ${config.color} text-base`}>
+                  <h3
+                    className="font-semibold text-base"
+                    style={{ color: config.cor }}
+                  >
                     {config.label}
                   </h3>
                   <button
@@ -397,10 +406,10 @@ export function ClientesKanban({ clientes: initialClientes, viewMode, onViewMode
                 </div>
                 {/* Valor total + Quantidade de clientes */}
                 <div className="flex items-center justify-between" style={{ marginTop: '-10px' }}>
-                  <span className={`text-sm font-medium`} style={{ color: '#4a4a4a' }}>
+                  <span className="text-sm font-medium" style={{ color: '#4a4a4a' }}>
                     {formatCurrency(valorTotalColuna)}
                   </span>
-                  <span className={`text-sm bg-white px-2 py-1 rounded-full font-medium`} style={{ color: '#4a4a4a' }}>
+                  <span className="text-sm bg-white px-2 py-1 rounded-full font-medium" style={{ color: '#4a4a4a' }}>
                     {clientesNaColuna.length} {clientesNaColuna.length === 1 ? 'cliente' : 'clientes'}
                   </span>
                 </div>
