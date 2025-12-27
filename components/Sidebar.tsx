@@ -10,7 +10,6 @@ import {
   Briefcase, 
   FolderTree, 
   Building2,
-  Settings,
   ChevronDown,
   ChevronUp,
   FileText,
@@ -19,7 +18,8 @@ import {
   UsersRound,
   Wallet,
   CheckSquare,
-  Calendar
+  Calendar,
+  Settings
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -60,6 +60,8 @@ const menuItems: MenuItem[] = [
     ]
   },
 ]
+
+const settingsItem: MenuItem = { href: '/configuracoes', label: 'Configurações', icon: Settings }
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -231,19 +233,19 @@ export function Sidebar() {
           )
         })}
       </nav>
-
-      <div className="p-4 border-t border-slate-800">
+      
+      <div className="border-t border-slate-800 p-4">
         <Link
-          href="/configuracoes"
+          href={settingsItem.href!}
           className={cn(
             'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
-            pathname === '/configuracoes' || pathname?.startsWith('/configuracoes/')
+            isItemActive(settingsItem)
               ? 'bg-primary-600 text-white'
               : 'text-slate-300 hover:bg-slate-800 hover:text-white'
           )}
         >
           <Settings className="w-5 h-5" />
-          <span className="font-medium">Configurações</span>
+          <span className="font-medium">{settingsItem.label}</span>
         </Link>
       </div>
     </aside>

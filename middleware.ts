@@ -76,7 +76,7 @@ export async function middleware(request: NextRequest) {
   // })
 
   // Rotas públicas que não precisam de autenticação nem assinatura ativa
-  const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/licenca-invalida']
+  const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/licenca-invalida', '/admin/login']
   const isPublicRoute = publicRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   )
@@ -116,7 +116,7 @@ export async function middleware(request: NextRequest) {
 
       const { data: assinante, error: errorAssinante } = await supabaseAdmin
         .from('assinantes')
-        .select('status, id, plano_nome')
+        .select('status, id, plano')
         .eq('user_id', user.id)
         .in('status', ['ativo', 'teste'])
         .maybeSingle()
@@ -138,8 +138,47 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Se o usuário está autenticado e tenta acessar página de login de admin
+  if (user && request.nextUrl.pathname === '/admin/login') {
+    // Se é admin, redirecionar para área de admin
+    if (isAdmin) {
+      const redirectResponse = NextResponse.redirect(new URL('/admin', request.url))
+      response.cookies.getAll().forEach(cookie => {
+        redirectResponse.cookies.set(cookie.name, cookie.value)
+      })
+      return redirectResponse
+    }
+    // Se não é admin, redirecionar para login normal
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Verificar se o usuário é admin ANTES de verificar assinatura
+  let isAdmin = false
+  if (user) {
+    try {
+      const { data: adminCheck, error: adminCheckError } = await supabase.rpc('is_user_admin', {
+        check_user_id: user.id
+      })
+      isAdmin = adminCheck === true && !adminCheckError
+    } catch (error: any) {
+      console.error('Erro ao verificar status de admin no middleware:', error)
+      isAdmin = false
+    }
+  }
+
+  // Verificar se está tentando acessar rota de admin
+  if (user && request.nextUrl.pathname.startsWith('/admin')) {
+    if (!isAdmin) {
+      // Não é admin - redirecionar para dashboard
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    // Se é admin, permitir acesso sem verificar assinatura
+    return response
+  }
+
   // VERIFICAÇÃO ÚNICA: Verificar assinatura ativa se o usuário está autenticado e não está em rota pública/API
-  if (user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/api/')) {
+  // IMPORTANTE: Admins não precisam de assinatura ativa
+  if (user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/api/') && !isAdmin) {
     try {
       // Usar Service Role Key para verificar assinatura (acesso à tabela assinantes)
       const supabaseAdmin = createClient(
@@ -156,7 +195,7 @@ export async function middleware(request: NextRequest) {
       // Verificar se o usuário tem assinatura com status "ativo" ou "teste"
       const { data: assinanteAtiva, error: errorAtiva } = await supabaseAdmin
         .from('assinantes')
-        .select('status, id, plano_nome, data_vencimento')
+        .select('status, id, plano, data_vencimento')
         .eq('user_id', user.id)
         .in('status', ['ativo', 'teste'])
         .maybeSingle()

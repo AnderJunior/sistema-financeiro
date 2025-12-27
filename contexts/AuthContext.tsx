@@ -92,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const safeUser = { ...session.user }
           if (safeUser.user_metadata?.foto_url && typeof safeUser.user_metadata.foto_url === 'string' && safeUser.user_metadata.foto_url.length > 50000) {
             // Foto muito grande, remover dos metadados locais
+            console.warn('Foto muito grande nos metadados, removendo localmente')
             delete safeUser.user_metadata.foto_url
           }
           setUser(safeUser)
@@ -112,13 +113,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut()
+      // Fazer logout no Supabase
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error('Erro ao fazer signOut no Supabase:', error)
+      }
+      
+      // Limpar estado do usuário
       setUser(null)
-      router.push('/login')
-      // Usar setTimeout para evitar conflitos com recompilação do Next.js
-      setTimeout(() => {
-        router.refresh()
-      }, 100)
+      
+      // Redirecionar para login usando window.location para garantir que funcione
+      window.location.href = '/login'
     } catch (error: any) {
       // Ignorar erros EBUSY relacionados ao OneDrive sincronizando arquivos .next
       if (error?.code === 'EBUSY' || error?.errno === -4082) {
@@ -131,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Para outros erros, ainda tentar redirecionar
       console.error('Erro ao fazer logout:', error)
       setUser(null)
+      // Sempre redirecionar para login, mesmo em caso de erro
       window.location.href = '/login'
     }
   }

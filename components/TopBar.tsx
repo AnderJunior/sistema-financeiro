@@ -1,24 +1,33 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { Search, Bell, User, LogOut } from 'lucide-react'
+import { Search, Bell, User, Settings, HelpCircle, LogOut } from 'lucide-react'
 import { NotificationsDropdown } from './NotificationsDropdown'
+import { HelpModal } from './modals/HelpModal'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/database.types'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 
 type Cliente = Database['public']['Tables']['clientes']['Row']
 
 export function TopBar() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
   const [notificationsCount, setNotificationsCount] = useState(0)
   const [searchResults, setSearchResults] = useState<Cliente[]>([])
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [userName, setUserName] = useState<string>('')
+  const [userEmail, setUserEmail] = useState<string>('')
+  const [loadingUserData, setLoadingUserData] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
+  const userMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const { user, signOut } = useAuth()
 
   useEffect(() => {
     // Carregar contagem inicial
@@ -62,22 +71,112 @@ export function TopBar() {
     return () => clearTimeout(timeoutId)
   }, [searchQuery])
 
+  const loadUserData = useCallback(async () => {
+    if (!user) {
+      setUserName('')
+      setUserEmail('')
+      setLoadingUserData(false)
+      return
+    }
+
+    setLoadingUserData(true)
+    
+    try {
+      const supabase = createClient()
+      
+      // Buscar informações do assinante (nome e email)
+      // 1) Tenta por user_id (fluxo padrão quando o registro já está vinculado ao usuário do Supabase)
+      // 2) Se não encontrar e houver email, tenta por email (útil quando o registro ainda não tem user_id preenchido)
+      const { data: assinantePorUserId, error: assinantePorUserIdError } = await supabase
+        .from('assinantes')
+        .select('nome_usuario, email, user_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      let assinante = assinantePorUserId
+      let assinanteError = assinantePorUserIdError
+
+      if (!assinante && !assinanteError && user.email) {
+        const { data: assinantePorEmail, error: assinantePorEmailError } = await supabase
+          .from('assinantes')
+          .select('nome_usuario, email, user_id')
+          .eq('email', user.email)
+          .maybeSingle()
+        assinante = assinantePorEmail
+        assinanteError = assinantePorEmailError
+      }
+
+      if (assinanteError) {
+        console.error('Erro ao buscar assinante no TopBar:', assinanteError)
+        // Fallback para email do auth
+        const nomeMeta = (user.user_metadata as any)?.nome_completo || (user.user_metadata as any)?.nome || (user.user_metadata as any)?.name
+        setUserName(nomeMeta || user.email?.split('@')[0] || 'Usuário')
+        setUserEmail(user.email || '')
+        setLoadingUserData(false)
+        return
+      }
+
+      if (assinante) {
+        // Usar dados da tabela assinantes
+        const nomeMeta = (user.user_metadata as any)?.nome_completo || (user.user_metadata as any)?.nome || (user.user_metadata as any)?.name
+        setUserName(assinante.nome_usuario || nomeMeta || user.email?.split('@')[0] || 'Usuário')
+        setUserEmail(assinante.email || user.email || '')
+      } else {
+        // Se não encontrar na tabela assinantes, usar email do auth
+        const nomeMeta = (user.user_metadata as any)?.nome_completo || (user.user_metadata as any)?.nome || (user.user_metadata as any)?.name
+        setUserName(nomeMeta || user.email?.split('@')[0] || 'Usuário')
+        setUserEmail(user.email || '')
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do usuário no TopBar:', error)
+      // Fallback para email do auth
+      const nomeMeta = (user.user_metadata as any)?.nome_completo || (user.user_metadata as any)?.nome || (user.user_metadata as any)?.name
+      setUserName(nomeMeta || user.email?.split('@')[0] || 'Usuário')
+      setUserEmail(user.email || '')
+    } finally {
+      setLoadingUserData(false)
+    }
+  }, [user])
+
+  // Pré-carregar dados do usuário assim que o `user` estiver disponível
+  useEffect(() => {
+    if (user) {
+      loadUserData()
+    } else {
+      // Limpar dados quando usuário não estiver disponível
+      setUserName('')
+      setUserEmail('')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
+
+  // Recarregar dados do usuário quando o modal abrir
+  useEffect(() => {
+    if (isUserMenuOpen && user) {
+      loadUserData()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUserMenuOpen])
+
   // Fechar dropdown ao clicar fora
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setIsSearchOpen(false)
       }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false)
+      }
     }
 
-    if (isSearchOpen) {
+    if (isSearchOpen || isUserMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [isSearchOpen])
+  }, [isSearchOpen, isUserMenuOpen])
 
   async function searchClientes(query: string) {
     if (query.length < 2) {
@@ -149,29 +248,6 @@ export function TopBar() {
       setNotificationsCount(count || 0)
     } catch (error) {
       console.error('Erro ao carregar contagem de notificações:', error)
-    }
-  }
-
-  async function handleLogout() {
-    try {
-      const supabase = createClient()
-      await supabase.auth.signOut()
-      router.push('/login')
-      // Usar setTimeout para evitar conflitos com recompilação do Next.js
-      setTimeout(() => {
-        router.refresh()
-      }, 100)
-    } catch (error: any) {
-      // Ignorar erros EBUSY relacionados ao OneDrive sincronizando arquivos .next
-      if (error?.code === 'EBUSY' || error?.errno === -4082) {
-        console.warn('Aviso: Arquivo temporariamente bloqueado pelo OneDrive. Logout concluído.')
-        // Forçar redirecionamento mesmo com erro
-        window.location.href = '/login'
-        return
-      }
-      // Para outros erros, ainda tentar redirecionar
-      console.error('Erro ao fazer logout:', error)
-      window.location.href = '/login'
     }
   }
 
@@ -255,7 +331,7 @@ export function TopBar() {
         )}
       </div>
 
-      {/* Ícone de notificações e logout */}
+      {/* Ícone de notificações e usuário */}
       <div className="flex items-center gap-2">
         <div className="flex items-center relative">
           <button
@@ -276,14 +352,105 @@ export function TopBar() {
           />
         </div>
 
-        <button
-          onClick={handleLogout}
-          className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-          title="Sair"
-        >
-          <LogOut className="w-5 h-5 text-gray-700" />
-        </button>
+        <div className="flex items-center relative">
+          <button
+            onClick={async () => {
+              if (!isUserMenuOpen) {
+                // Abrir o modal primeiro
+                setIsUserMenuOpen(true)
+                // Carregar dados após abrir (o useEffect também vai chamar, mas isso garante)
+                if (user) {
+                  await loadUserData()
+                }
+              } else {
+                setIsUserMenuOpen(false)
+              }
+            }}
+            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            title="Usuário"
+          >
+            <User className="w-5 h-5 text-gray-700" />
+          </button>
+
+          {/* Dropdown do menu do usuário */}
+          {isUserMenuOpen && (
+            <div
+              ref={userMenuRef}
+              className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50"
+            >
+              {/* Parte superior - Informações do usuário */}
+              <div className="px-4 py-4">
+                {loadingUserData ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-xs text-gray-500">Carregando...</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {userName || 'Usuário'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {userEmail || user?.email || ''}
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {/* Divisor */}
+              <div className="border-t border-gray-200"></div>
+
+              {/* Parte inferior - Opções do menu */}
+              <div className="py-2">
+                <button
+                  onClick={() => {
+                    router.push('/configuracoes')
+                    setIsUserMenuOpen(false)
+                  }}
+                  className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-left flex items-center gap-3"
+                >
+                  <Settings className="w-5 h-5 text-gray-600" />
+                  <span className="text-sm text-gray-700">Minha Conta</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsUserMenuOpen(false)
+                    setIsHelpModalOpen(true)
+                  }}
+                  className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-left flex items-center gap-3"
+                >
+                  <HelpCircle className="w-5 h-5 text-gray-600" />
+                  <span className="text-sm text-gray-700">Ajuda</span>
+                </button>
+
+                <button
+                  onClick={async () => {
+                    setIsUserMenuOpen(false)
+                    try {
+                      await signOut()
+                    } catch (error) {
+                      console.error('Erro ao fazer logout:', error)
+                      // Forçar redirecionamento mesmo em caso de erro
+                      window.location.href = '/login'
+                    }
+                  }}
+                  className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-left flex items-center gap-3"
+                >
+                  <LogOut className="w-5 h-5 text-red-600" />
+                  <span className="text-sm text-red-600">Sair</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Modal de Ajuda */}
+      <HelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+      />
     </header>
   )
 }

@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 interface AssinaturaInfo {
   id: string
   status: string
-  plano_nome: string | null
+  plano_nome: string | null // Mantido para compatibilidade, mas agora pode ser UUID do plano
   data_vencimento: string | null
 }
 
@@ -98,7 +98,7 @@ export function AssinaturaProvider({ children }: { children: React.ReactNode }) 
       // Verificar assinatura ativa (ativo ou teste)
       const { data: assinante, error: assinaturaError } = await supabase
         .from('assinantes')
-        .select('id, status, plano_nome, data_vencimento')
+        .select('id, status, plano, data_vencimento')
         .eq('user_id', user.id)
         .in('status', ['ativo', 'teste'])
         .maybeSingle()
@@ -165,7 +165,7 @@ export function AssinaturaProvider({ children }: { children: React.ReactNode }) 
       const info: AssinaturaInfo = {
         id: assinante.id,
         status: assinante.status || '',
-        plano_nome: assinante.plano_nome,
+        plano_nome: assinante.plano || null, // Agora plano é UUID, mas mantemos compatibilidade
         data_vencimento: assinante.data_vencimento,
       }
       

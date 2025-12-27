@@ -10,16 +10,14 @@
 6. [Estrutura do Banco de Dados](#estrutura-do-banco-de-dados)
 7. [APIs e Endpoints](#apis-e-endpoints)
 8. [Autenticação e Segurança](#autenticação-e-segurança)
-9. [Sistema de Automações](#sistema-de-automações)
-10. [Componentes Principais](#componentes-principais)
-11. [Integrações](#integrações)
-12. [Considerações para App Mobile](#considerações-para-app-mobile)
+9. [Componentes Principais](#componentes-principais)
+10. [Integrações](#integrações)
 
 ---
 
 ## 🎯 Visão Geral
 
-Sistema completo de gestão financeira e clientes desenvolvido com Next.js 14, TypeScript e Supabase. O sistema oferece controle completo de clientes, projetos, tarefas, finanças e automações de processos.
+Sistema completo de gestão financeira e clientes desenvolvido com Next.js 14, TypeScript e Supabase. O sistema oferece controle completo de clientes, projetos, tarefas e finanças.
 
 ---
 
@@ -31,7 +29,6 @@ O Sistema Financeiro ERP foi desenvolvido para:
 - **Gestão Financeira**: Lançamentos de entradas e saídas, categorização, controle de contas e carteiras
 - **Gestão de Projetos**: Acompanhamento de projetos com controle de progresso, valores e prazos
 - **Gestão de Serviços**: Cadastro e controle de serviços oferecidos (recorrentes, assinaturas, avulsos, projetos)
-- **Automações**: Sistema de workflows visuais para automação de processos
 - **Tarefas**: Gerenciamento de tarefas com visualização Kanban e calendário
 - **Relatórios e Dashboards**: Visualização de métricas, gráficos e análises financeiras
 
@@ -46,7 +43,6 @@ O Sistema Financeiro ERP foi desenvolvido para:
 - **Tailwind CSS**
 - **Lucide React** (Ícones)
 - **ApexCharts / Recharts** (Gráficos)
-- **ReactFlow** (Automações visuais)
 - **TipTap** (Editor de texto rico)
 
 ### Backend
@@ -121,10 +117,6 @@ O Sistema Financeiro ERP foi desenvolvido para:
 - `/financeiro/contas` - Contas financeiras
 - `/financeiro/categorias` - Categorias financeiras
 - `/financeiro/novo` - Novo lançamento
-
-#### Automações
-- `/automacoes` - Lista de fluxos de automação
-- `/automacoes/[id]` - Editor visual de automação (ReactFlow)
 
 #### Configurações
 - `/configuracoes` - Configurações do sistema
@@ -291,40 +283,7 @@ O Sistema Financeiro ERP foi desenvolvido para:
   - Histórico de atividades
   - Log de mudanças
 
-### 7. Sistema de Automações
-
-#### Funcionalidades:
-- **Editor Visual**:
-  - Interface drag-and-drop (ReactFlow)
-  - Nós de gatilho
-  - Nós de ação
-  - Nós de transformação
-  - Conexões entre nós
-
-- **Tipos de Gatilhos**:
-  - Manual
-  - Nova Cobrança
-  - Novo Cliente
-  - Novo Projeto
-  - Agendado por Data
-  - Mudança de Status de Cobrança
-  - Webhook de Entrada
-
-- **Tipos de Ações**:
-  - Enviar Email
-  - Criar Lançamento
-  - Atualizar Cliente
-  - Criar Notificação
-  - Webhook de Saída
-  - Delay/Atraso
-
-- **Execução**:
-  - Execução manual
-  - Execução automática (via triggers)
-  - Logs de execução
-  - Histórico de execuções
-
-### 8. Dashboard e Relatórios
+### 7. Dashboard e Relatórios
 
 #### Funcionalidades:
 - **Estatísticas**:
@@ -643,60 +602,7 @@ Log de notificações do sistema.
 - `idx_notificacoes_lida`
 - `idx_notificacoes_relacionado`
 
-#### 16. `fluxos_automacao`
-Fluxos de automação (workflows).
-
-```sql
-- id: UUID (PK)
-- nome: VARCHAR(255) NOT NULL
-- descricao: TEXT
-- tipo_automacao: VARCHAR(50) CHECK ('notificacao', 'cobranca', 'relatorio', 'integracao', 'backup', 'limpeza', 'sincronizacao', 'outro')
-- status: VARCHAR(20) DEFAULT 'rascunho' CHECK ('ativo', 'inativo', 'rascunho')
-- configuracao: JSONB DEFAULT '{}' (nodes, edges, etc)
-- ativo: BOOLEAN DEFAULT true
-- created_at: TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-- updated_at: TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-```
-
-**Índices:**
-- `idx_fluxos_automacao_tipo`
-- `idx_fluxos_automacao_status`
-- `idx_fluxos_automacao_ativo`
-
-#### 17. `workflow_executions`
-Execuções de workflows.
-
-```sql
-- id: UUID (PK)
-- workflow_id: UUID NOT NULL
-- execution_id: VARCHAR(255) NOT NULL
-- status: VARCHAR(20) CHECK ('running', 'completed', 'failed', 'paused')
-- started_at: TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-- completed_at: TIMESTAMP WITH TIME ZONE
-- duration_ms: INTEGER
-- node_states: JSONB DEFAULT '{}'
-- edge_states: JSONB DEFAULT '{}'
-- logs: JSONB DEFAULT '[]'
-- created_at: TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-- updated_at: TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-```
-
-#### 18. `workflow_execution_node_states`
-Estados dos nós durante execução.
-
-```sql
-- id: UUID (PK)
-- execution_id: UUID (FK -> workflow_executions)
-- node_id: VARCHAR(255) NOT NULL
-- status: VARCHAR(20) CHECK ('idle', 'running', 'success', 'error', 'waiting')
-- started_at: TIMESTAMP WITH TIME ZONE
-- completed_at: TIMESTAMP WITH TIME ZONE
-- error: TEXT
-- output: JSONB
-- created_at: TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-```
-
-#### 19. `assinantes`
+#### 16. `assinantes`
 Tabela de assinantes/licenciamento.
 
 ```sql
@@ -728,7 +634,7 @@ Tabela de assinantes/licenciamento.
 - `idx_assinantes_user_id`
 - `idx_assinantes_proxima_verificacao`
 
-#### 20. `configuracoes_sistema`
+#### 17. `configuracoes_sistema`
 Configurações gerais do sistema.
 
 ```sql
@@ -786,23 +692,7 @@ Verifica se um assinante está ativo no sistema de licenciamento.
 }
 ```
 
-#### 2. `/api/webhook/[flowId]`
-**Método:** POST / GET
-
-Endpoint para acionar workflows via webhook.
-
-**POST:**
-- Executa o fluxo de automação especificado
-- Valida segredo se configurado
-- Retorna resultado da execução
-
-**GET:**
-- Retorna informações sobre o webhook
-
-**Headers:**
-- `x-webhook-secret` (opcional, se configurado no fluxo)
-
-#### 3. `/api/verificar-servicos-atrasados`
+#### 2. `/api/verificar-servicos-atrasados`
 **Método:** GET
 
 Verifica serviços atrasados e gera notificações.
@@ -815,7 +705,7 @@ Verifica serviços atrasados e gera notificações.
 }
 ```
 
-#### 4. `/api/limpar-metadados-usuario`
+#### 3. `/api/limpar-metadados-usuario`
 **Método:** POST
 
 Limpa metadados corrompidos de usuários.
@@ -889,54 +779,6 @@ O sistema possui controle de assinatura:
 
 ---
 
-## 🤖 Sistema de Automações
-
-### Estrutura
-
-O sistema de automações utiliza uma interface visual baseada em **ReactFlow**:
-
-- **Editor Visual:** Drag-and-drop de nós
-- **Execução:** Motor de execução de workflows
-- **Triggers:** Gatilhos automáticos e manuais
-
-### Tipos de Nós
-
-#### Gatilhos (Triggers)
-1. **Gatilho Manual** - Execução manual
-2. **Nova Cobrança** - Dispara ao criar lançamento financeiro
-3. **Novo Cliente** - Dispara ao criar cliente
-4. **Novo Projeto** - Dispara ao criar projeto
-5. **Agendado por Data** - Execução agendada
-6. **Mudança de Status de Cobrança** - Dispara ao alterar status
-7. **Webhook de Entrada** - Recebe requisições HTTP
-
-#### Ações
-1. **Enviar Email**
-2. **Criar Lançamento**
-3. **Atualizar Cliente**
-4. **Criar Notificação**
-5. **Webhook de Saída**
-6. **Delay/Atraso**
-
-#### Transformações
-1. **Manipular Dados**
-2. **Condicionais**
-3. **Loops**
-
-### Execução
-
-- **Manual:** Via interface do editor
-- **Automática:** Via triggers do sistema
-- **Webhook:** Via endpoint `/api/webhook/[flowId]`
-
-### Armazenamento
-
-Os fluxos são armazenados na tabela `fluxos_automacao`:
-- `configuracao` (JSONB): Contém nodes, edges e configurações
-- Execuções são logadas em `workflow_executions`
-
----
-
 ## 🧩 Componentes Principais
 
 ### Componentes de UI
@@ -994,14 +836,6 @@ Os fluxos são armazenados na tabela `fluxos_automacao`:
 - `dashboard/ServicosProximosVencimento.tsx` - Serviços próximos vencimento
 - `dashboard/ConfiguracoesIniciais.tsx` - Configurações iniciais
 
-#### Automações
-- `workflow/WorkflowCanvas.tsx` - Canvas do editor
-- `workflow/WorkflowShell.tsx` - Shell do editor
-- `workflow/CustomNode.tsx` - Nó customizado
-- `workflow/AnimatedEdge.tsx` - Conexão animada
-- `workflow/ExecutionLogsPanel.tsx` - Painel de logs
-- `FluxosAutomacaoTable.tsx` - Tabela de fluxos
-
 #### Outros
 - `NotificationsDropdown.tsx` - Dropdown de notificações
 - `GruposTable.tsx` - Tabela de grupos
@@ -1018,7 +852,6 @@ Os fluxos são armazenados na tabela `fluxos_automacao`:
 - `TarefaModal.tsx` - Modal de tarefa
 - `TarefaDetailModal.tsx` - Modal de detalhes de tarefa
 - `EditarCobrancaModal.tsx` - Modal de edição de cobrança
-- `FluxoAutomacaoModal.tsx` - Modal de fluxo de automação
 - `AlertModal.tsx` - Modal de alerta
 - `ConfirmModal.tsx` - Modal de confirmação
 
@@ -1027,12 +860,10 @@ Os fluxos são armazenados na tabela `fluxos_automacao`:
 - `AuthContext.tsx` - Contexto de autenticação
 - `ModalContext.tsx` - Contexto de modais
 - `AssinaturaContext.tsx` - Contexto de assinatura
-- `AutomationTriggerProvider.tsx` - Provider de triggers
 
 ### Hooks
 
 - `useAuth.ts` - Hook de autenticação
-- `useWorkflowExecution.ts` - Hook de execução de workflows
 - `useAssinaturaAtiva.ts` - Hook de assinatura
 - `useRealtime.ts` - Hook de realtime
 
@@ -1055,14 +886,6 @@ O sistema possui integração com **Asaas**:
 - Criação de cobranças
 - Webhooks de atualização de status
 - Assinaturas recorrentes
-
-### Webhooks
-
-O sistema suporta webhooks:
-
-- **Entrada:** Via gatilho "Webhook de Entrada" em automações
-- **Saída:** Via ação "Webhook de Saída" em automações
-- **Endpoint:** `/api/webhook/[flowId]`
 
 ---
 
@@ -1226,7 +1049,6 @@ SUPABASE_ANON_KEY=your_anon_key
 ### Limitações Atuais
 
 - Sistema web-first (algumas funcionalidades podem precisar de adaptação)
-- Editor de automações visual (ReactFlow) pode não ser adequado para mobile
 - Dashboard com muitos gráficos pode precisar de versão simplificada
 
 ### Melhorias Sugeridas para Mobile
